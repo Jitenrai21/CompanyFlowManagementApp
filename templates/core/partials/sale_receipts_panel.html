@@ -14,7 +14,6 @@
                         <th>Date</th>
                         <th>Category</th>
                         <th>Amount</th>
-                        <th>Status</th>
                         <th>Running Balance</th>
                     </tr>
                 </thead>
@@ -24,16 +23,11 @@
                         <td>{{ row.receipt.date }}</td>
                         <td>{{ row.receipt.category }}</td>
                         <td>NPR {{ row.receipt.amount }}</td>
-                        <td>
-                            <span class="badge {% if row.receipt.status == 'paid' %}badge-success{% else %}badge-warning{% endif %}">
-                                {{ row.receipt.get_status_display }}
-                            </span>
-                        </td>
                         <td>NPR {{ row.running_balance }}</td>
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="5" class="py-0">
+                        <td colspan="4" class="py-0">
                             <div class="cf-empty">
                                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h8a1 1 0 110 2H4a1 1 0 01-1-1zm1 3a1 1 0 100 2h12a1 1 0 100-2H4z" /></svg>
                                 <p>No linked receipts yet.</p>
@@ -52,6 +46,12 @@
             {% if inline_success %}
             <div class="alert alert-success text-sm"><span>{{ inline_success }}</span></div>
             {% endif %}
+            {% if not can_add_receipts %}
+            <div class="alert alert-warning text-sm">
+                <span>Assign a customer to this sale before adding cash receipts.</span>
+            </div>
+            {% endif %}
+            {% if can_add_receipts %}
             <form
                 method="post"
                 action="{% url 'sale_receipt_create' sale.id %}"
@@ -77,14 +77,14 @@
                     {% if receipt_form.amount.errors %}<p class="text-error text-sm mt-1">{{ receipt_form.amount.errors|join:', ' }}</p>{% endif %}
                 </div>
                 <div class="form-control">
+                    <label class="label" for="id_payment_method"><span class="label-text">Payment Method</span></label>
+                    {{ receipt_form.payment_method }}
+                    {% if receipt_form.payment_method.errors %}<p class="text-error text-sm mt-1">{{ receipt_form.payment_method.errors|join:', ' }}</p>{% endif %}
+                </div>
+                <div class="form-control">
                     <label class="label" for="id_category"><span class="label-text">Category</span></label>
                     {{ receipt_form.category }}
                     {% if receipt_form.category.errors %}<p class="text-error text-sm mt-1">{{ receipt_form.category.errors|join:', ' }}</p>{% endif %}
-                </div>
-                <div class="form-control">
-                    <label class="label" for="id_status"><span class="label-text">Status</span></label>
-                    {{ receipt_form.status }}
-                    {% if receipt_form.status.errors %}<p class="text-error text-sm mt-1">{{ receipt_form.status.errors|join:', ' }}</p>{% endif %}
                 </div>
                 <div class="form-control">
                     <label class="label" for="id_description"><span class="label-text">Description</span></label>
@@ -94,6 +94,7 @@
 
                 <button class="btn btn-primary w-full" type="submit">Add Receipt</button>
             </form>
+            {% endif %}
         </div>
     </div>
 </div>

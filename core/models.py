@@ -28,6 +28,14 @@ class TransactionType(models.TextChoices):
     EXPENSE = "expense", "Expense"
 
 
+class PaymentMethod(models.TextChoices):
+    CASH = "cash", "Cash"
+    BANK_TRANSFER = "bank_transfer", "Bank Transfer"
+    CHEQUE = "cheque", "Cheque"
+    MOBANKING = "mobanking", "Mobanking"
+    OTHER = "other", "Other"
+
+
 class Customer(TimeStampedModel):
     name = models.CharField(max_length=150)
     phone = models.CharField(max_length=30, blank=True)
@@ -52,12 +60,19 @@ class Transaction(TimeStampedModel):
     date = models.DateField(default=timezone.now)
     amount = models.DecimalField(max_digits=14, decimal_places=2)
     type = models.CharField(max_length=10, choices=TransactionType.choices)
+    payment_method = models.CharField(
+        max_length=20,
+        choices=PaymentMethod.choices,
+        default=PaymentMethod.CASH,
+    )
     category = models.CharField(max_length=80)
     description = models.TextField(blank=True)
     customer = models.ForeignKey(
         Customer,
-        on_delete=models.PROTECT,
+        on_delete=models.SET_NULL,
         related_name="transactions",
+        blank=True,
+        null=True,
     )
     sale = models.ForeignKey(
         "Sale",
@@ -66,48 +81,32 @@ class Transaction(TimeStampedModel):
         blank=True,
         null=True,
     )
-    due_date = models.DateField(blank=True, null=True)
     attachment = models.FileField(upload_to="transactions/", blank=True, null=True)
-    status = models.CharField(
-        max_length=10,
-        choices=RecordStatus.choices,
-        default=RecordStatus.PENDING,
-    )
 
     class Meta:
         ordering = ["-date", "-created_at"]
         indexes = [
             models.Index(fields=["date"]),
             models.Index(fields=["customer"]),
-            models.Index(fields=["status"]),
         ]
 
     def __str__(self) -> str:
         return f"{self.get_type_display()} - {self.amount} ({self.date})"
 
-    @property
-    def alert_state(self):
-        if not self.due_date:
-            return "none"
-        if self.status == RecordStatus.PAID:
-            return "resolved"
-
-        today = timezone.localdate()
-        if self.due_date < today:
-            return "overdue"
-        if self.due_date <= today + timedelta(days=7):
-            return "upcoming"
-        return "none"
-
-
 class Sale(TimeStampedModel):
     invoice_number = models.CharField(max_length=40, unique=True)
     date = models.DateField(default=timezone.now)
-    customer = models.ForeignKey(Customer, on_delete=models.PROTECT, related_name="sales")
+    customer = models.ForeignKey(
+        Customer,
+        on_delete=models.SET_NULL,
+        related_name="sales",
+        blank=True,
+        null=True,
+    )
     items = models.JSONField(default=list, blank=True)
     notes = models.TextField(blank=True)
     total_amount = models.DecimalField(max_digits=14, decimal_places=2)
-    due_date = models.DateField()
+    due_date = models.DateField(blank=True, null=True)
     paid_amount = models.DecimalField(max_digits=14, decimal_places=2, default=0)
     status = models.CharField(
         max_length=10,
@@ -142,6 +141,8 @@ class Sale(TimeStampedModel):
 
     @property
     def alert_state(self):
+        if not self.due_date:
+            return "none"
         if self.payment_status == "paid":
             return "resolved"
 

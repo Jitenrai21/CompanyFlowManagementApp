@@ -116,10 +116,29 @@ body {
 }
 
 .cf-kpi-card {
+    position: relative;
+    overflow: hidden;
     border-radius: 0.95rem;
     border: 1px solid rgba(74, 98, 138, 0.14);
-    background-color: rgba(248, 253, 252, 0.94);
+    background: linear-gradient(160deg, rgba(250, 254, 253, 0.97), rgba(238, 249, 249, 0.9));
     padding: 0.95rem;
+    box-shadow: 0 12px 26px -24px rgba(74, 98, 138, 0.5);
+    transition: transform 180ms ease, box-shadow 180ms ease;
+}
+
+.cf-kpi-card:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 16px 28px -22px rgba(74, 98, 138, 0.56);
+}
+
+.cf-kpi-card::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+    background: rgba(74, 98, 138, 0.5);
 }
 
 .cf-kpi-card .kpi-label {
@@ -135,11 +154,46 @@ body {
     font-weight: 700;
 }
 
+.cf-kpi-card .kpi-note {
+    font-size: 0.7rem;
+    color: rgba(47, 70, 102, 0.65);
+    line-height: 1.25;
+}
+
+.cf-kpi-card--sales::before {
+    background: #4a628a;
+}
+
+.cf-kpi-card--income::before {
+    background: #2b8b57;
+}
+
+.cf-kpi-card--expense::before {
+    background: #cf5246;
+}
+
+.cf-kpi-card--receivable::before {
+    background: #3d7d9c;
+}
+
+.cf-kpi-card--overdue::before {
+    background: #c68a2b;
+}
+
 .cf-skeleton {
     border-radius: 0.9rem;
     background: linear-gradient(90deg, rgba(168, 207, 219, 0.34), rgba(185, 229, 232, 0.38), rgba(168, 207, 219, 0.34));
     background-size: 220% 100%;
     animation: cf-wave 1.35s ease-in-out infinite;
+}
+
+.htmx-indicator {
+    display: none;
+}
+
+.htmx-request .htmx-indicator,
+.htmx-request.htmx-indicator {
+    display: block;
 }
 
 .cf-topbar {

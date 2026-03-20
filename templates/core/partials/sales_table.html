@@ -10,6 +10,7 @@
                     <th>Invoice</th>
                     <th>Date</th>
                     <th>Customer</th>
+                    <th>Items</th>
                     <th>Total</th>
                     <th>Received</th>
                     <th>Balance</th>
@@ -24,13 +25,27 @@
                         <a href="{% url 'sale_detail' sale.id %}" class="link link-primary">{{ sale.invoice_number }}</a>
                     </td>
                     <td>{{ sale.date }}</td>
-                    <td>{{ sale.customer.name }}</td>
+                    <td>{% if sale.customer %}{{ sale.customer.name }}{% else %}<span class="text-base-content/60">Unassigned</span>{% endif %}</td>
+                    <td>
+                        {% if sale.items %}
+                            <div class="space-y-1 text-xs leading-tight">
+                                {% for item in sale.items %}
+                                    <div>
+                                        <span class="font-medium">{{ item.item }}</span>
+                                        <span class="text-base-content/60">x{{ item.quantity|default:1 }}</span>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                            <span class="text-base-content/60">No items</span>
+                        {% endif %}
+                    </td>
                     <td>NPR {{ sale.total_amount }}</td>
                     <td>NPR {{ sale.received_total }}</td>
                     <td>NPR {{ sale.remaining_balance }}</td>
                     <td>
-                        <span class="badge {% if sale.payment_state == 'paid' %}badge-success{% elif sale.payment_state == 'partial' %}badge-warning{% else %}badge-error{% endif %}">
-                            {{ sale.payment_state|title }}
+                        <span class="badge {% if sale.status == 'paid' %}badge-success{% else %}badge-warning{% endif %}">
+                            {{ sale.get_status_display }}
                         </span>
                     </td>
                     <td class="text-right space-x-1">
@@ -40,7 +55,7 @@
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="8" class="py-0">
+                    <td colspan="9" class="py-0">
                         <div class="cf-empty">
                             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M4 3a1 1 0 000 2h12a1 1 0 100-2H4zm-1 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm1 3a1 1 0 100 2h5a1 1 0 100-2H4zm8 0a1 1 0 000 2h4a1 1 0 100-2h-4z" /></svg>
                             <p>No sales found for selected filters.</p>

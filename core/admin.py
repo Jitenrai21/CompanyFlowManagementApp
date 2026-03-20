@@ -13,8 +13,16 @@ class CustomerAdmin(admin.ModelAdmin):
 
 @admin.register(Transaction)
 class TransactionAdmin(admin.ModelAdmin):
-    list_display = ("date", "due_date", "customer", "sale", "type", "category", "amount", "status")
-    list_filter = ("type", "status", "date", "due_date", "category", "sale")
+    list_display = (
+        "date",
+        "customer",
+        "sale",
+        "type",
+        "payment_method",
+        "category",
+        "amount",
+    )
+    list_filter = ("type", "payment_method", "date", "category", "sale")
     search_fields = (
         "customer__name",
         "category",

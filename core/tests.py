@@ -9,7 +9,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from .forms import SaleForm
-from .models import AlertNotification, Customer, CustomerType, RecordStatus, Sale, Transaction, TransactionType
+from .models import AlertNotification, Customer, CustomerType, Sale, Transaction, TransactionType
 
 
 class SalesWorkflowTests(TestCase):
@@ -48,7 +48,6 @@ class SalesWorkflowTests(TestCase):
 			amount=Decimal("400.00"),
 			type=TransactionType.INCOME,
 			category="Sales Receipt",
-			status=RecordStatus.PAID,
 		)
 		response_partial = self.client.get(reverse("sales"), {"status": "partial"})
 		self.assertContains(response_partial, "INV-1001")
@@ -60,7 +59,6 @@ class SalesWorkflowTests(TestCase):
 			amount=Decimal("600.00"),
 			type=TransactionType.INCOME,
 			category="Sales Receipt",
-			status=RecordStatus.PAID,
 		)
 		response_paid = self.client.get(reverse("sales"), {"status": "paid"})
 		self.assertContains(response_paid, "INV-1001")
@@ -101,9 +99,9 @@ class SalesWorkflowTests(TestCase):
 			data={
 				"date": "2026-03-12",
 				"amount": "700",
+				"payment_method": "cash",
 				"category": "Sales Receipt",
 				"description": "First payment",
-				"status": RecordStatus.PAID,
 			},
 			HTTP_HX_REQUEST="true",
 		)
@@ -138,7 +136,6 @@ class DashboardWorkflowTests(TestCase):
 			amount=Decimal("300.00"),
 			type=TransactionType.INCOME,
 			category="Sales Receipt",
-			status=RecordStatus.PAID,
 		)
 		Transaction.objects.create(
 			customer=self.customer,
@@ -146,7 +143,6 @@ class DashboardWorkflowTests(TestCase):
 			amount=Decimal("200.00"),
 			type=TransactionType.EXPENSE,
 			category="Operations",
-			status=RecordStatus.PAID,
 		)
 
 	def test_dashboard_requires_login(self):
@@ -208,20 +204,10 @@ class AlertsWorkflowTests(TestCase):
 			items=[{"item": "B", "quantity": 1, "price": 800}],
 		)
 
-		self.overdue_tx = Transaction.objects.create(
-			customer=self.customer,
-			date=today - timedelta(days=5),
-			due_date=today - timedelta(days=1),
-			amount=Decimal("200.00"),
-			type=TransactionType.EXPENSE,
-			category="Vendor Payable",
-			status=RecordStatus.PENDING,
-		)
-
 	def test_alert_states_for_sale_and_transaction(self):
 		self.assertEqual(self.overdue_sale.alert_state, "overdue")
 		self.assertEqual(self.upcoming_sale.alert_state, "upcoming")
-		self.assertEqual(self.overdue_tx.alert_state, "overdue")
+
 
 	def test_alerts_page_requires_login(self):
 		response = self.client.get(reverse("alerts"))
@@ -233,7 +219,6 @@ class AlertsWorkflowTests(TestCase):
 		response = self.client.get(reverse("alerts"), {"type": "overdue"})
 		self.assertEqual(response.status_code, 200)
 		self.assertContains(response, "NPR 1000.00")
-		self.assertContains(response, "NPR 200.00")
 		self.assertNotContains(response, "NPR 800.00")
 
 	def test_badge_count_and_viewed_mark_read(self):

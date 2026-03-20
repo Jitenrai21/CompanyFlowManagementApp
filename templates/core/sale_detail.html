@@ -22,7 +22,8 @@
             <div class="card-body space-y-4">
                 <h2 class="card-title text-xl">Sale Information</h2>
                 <div class="grid gap-3 md:grid-cols-2 text-sm">
-                    <p><span class="font-semibold">Customer:</span> {{ sale.customer.name }}</p>
+                    <p><span class="font-semibold">Customer:</span> {% if sale.customer %}{{ sale.customer.name }}{% else %}Unassigned{% endif %}</p>
+                    <p><span class="font-semibold">Status:</span> {{ sale.get_status_display }}</p>
                     <p><span class="font-semibold">Date:</span> {{ sale.date }}</p>
                     <p><span class="font-semibold">Due Date:</span> {{ sale.due_date }}</p>
                     <p><span class="font-semibold">Total Amount:</span> NPR {{ sale.total_amount }}</p>
@@ -30,7 +31,32 @@
                 </div>
                 <div>
                     <p class="font-semibold text-sm mb-1">Itemized List</p>
-                    <pre class="bg-base-200/70 rounded-xl p-3 text-xs overflow-x-auto">{{ sale.items|pprint }}</pre>
+                    <div class="overflow-x-auto">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Item</th>
+                                    <th class="text-right">Qty</th>
+                                    <th class="text-right">Price</th>
+                                    <th class="text-right">Amount</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in sale.items %}
+                                <tr>
+                                    <td>{{ item.item }}</td>
+                                    <td class="text-right">{{ item.quantity|default:1 }}</td>
+                                    <td class="text-right">NPR {{ item.price }}</td>
+                                    <td class="text-right">NPR {{ item.amount|default:item.price }}</td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="4" class="text-base-content/60">No items recorded.</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>
@@ -50,10 +76,10 @@
             </div>
             <div class="cf-section">
                 <div class="card-body">
-                    <p class="text-sm text-base-content/60">Payment Status</p>
+                    <p class="text-sm text-base-content/60">Sale Status</p>
                     <p>
-                        <span class="badge badge-lg {% if payment_status == 'paid' %}badge-success{% elif payment_status == 'partial' %}badge-warning{% else %}badge-error{% endif %}">
-                            {{ payment_status|title }}
+                        <span class="badge badge-lg {% if sale_status == 'paid' %}badge-success{% else %}badge-warning{% endif %}">
+                            {{ sale.get_status_display }}
                         </span>
                     </p>
                 </div>

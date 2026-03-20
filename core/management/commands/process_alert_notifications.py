@@ -8,7 +8,7 @@ from django.db.models import F, Q, Sum, Value
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 
-from core.models import AlertNotification, AlertSource, AlertType, RecordStatus, Sale, Transaction, TransactionType
+from core.models import AlertNotification, AlertSource, AlertType, Sale, TransactionType
 
 logger = logging.getLogger(__name__)
 
@@ -71,54 +71,6 @@ class Command(BaseCommand):
             if created:
                 created_count += 1
                 logger.info("Created sale alert notification for sale=%s type=%s", sale.id, alert_type)
-            else:
-                updated_count += 1
-
-        tx_queryset = Transaction.objects.select_related("customer").filter(
-            due_date__isnull=False,
-            status=RecordStatus.PENDING,
-        )
-
-        for transaction in tx_queryset:
-            alert_type = None
-            if transaction.due_date < today:
-                alert_type = AlertType.OVERDUE
-            elif today <= transaction.due_date <= upcoming_end:
-                alert_type = AlertType.UPCOMING
-
-            if not alert_type:
-                continue
-
-            signature = (alert_type, AlertSource.TRANSACTION, transaction.id, transaction.due_date)
-            active_signatures.add(signature)
-
-            title = f"Transaction {transaction.category} is {alert_type}"
-            message = (
-                f"Customer {transaction.customer.name} has a pending transaction in category "
-                f"{transaction.category} due on {transaction.due_date}."
-            )
-
-            _, created = AlertNotification.objects.update_or_create(
-                alert_type=alert_type,
-                source_type=AlertSource.TRANSACTION,
-                source_id=transaction.id,
-                due_date=transaction.due_date,
-                defaults={
-                    "customer": transaction.customer,
-                    "amount": transaction.amount,
-                    "title": title,
-                    "message": message,
-                    "is_active": True,
-                    "resolved_at": None,
-                },
-            )
-            if created:
-                created_count += 1
-                logger.info(
-                    "Created transaction alert notification for transaction=%s type=%s",
-                    transaction.id,
-                    alert_type,
-                )
             else:
                 updated_count += 1
 

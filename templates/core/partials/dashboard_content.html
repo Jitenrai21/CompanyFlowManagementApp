@@ -1,25 +1,39 @@
 <div class="space-y-6">
-    <div class="cf-kpi-grid">
-        <div class="cf-kpi-card">
-            <p class="kpi-label">Total Sales</p>
-            <p class="kpi-value">NPR {{ kpis.total_sales }}</p>
+    <div class="grid grid-cols-5 gap-3">
+        <div class="cf-kpi-card cf-kpi-card--sales">
+            <div class="min-w-0 space-y-1">
+                <p class="kpi-label !mt-0">Total Sales</p>
+                <p class="kpi-value !mt-0 text-xl leading-tight">NPR {{ kpis.total_sales }}</p>
+                <p class="kpi-note">Gross billed in selected date range</p>
+            </div>
         </div>
-        <div class="cf-kpi-card">
-            <p class="kpi-label">Total Income</p>
-            <p class="kpi-value text-success">NPR {{ kpis.total_income }}</p>
+        <div class="cf-kpi-card cf-kpi-card--income">
+            <div class="min-w-0 space-y-1">
+                <p class="kpi-label !mt-0">Total Income</p>
+                <p class="kpi-value !mt-0 text-xl leading-tight text-success">NPR {{ kpis.total_income }}</p>
+                <p class="kpi-note">All recorded incoming cash</p>
+            </div>
         </div>
-        <div class="cf-kpi-card">
-            <p class="kpi-label">Total Expenses</p>
-            <p class="kpi-value text-error">NPR {{ kpis.total_expenses }}</p>
+        <div class="cf-kpi-card cf-kpi-card--expense">
+            <div class="min-w-0 space-y-1">
+                <p class="kpi-label !mt-0">Total Expenses</p>
+                <p class="kpi-value !mt-0 text-xl leading-tight text-error">NPR {{ kpis.total_expenses }}</p>
+                <p class="kpi-note">All recorded outgoing cash</p>
+            </div>
         </div>
-        <div class="cf-kpi-card">
-            <p class="kpi-label">Outstanding Receivables</p>
-            <p class="kpi-value">NPR {{ kpis.outstanding_receivables }}</p>
+        <div class="cf-kpi-card cf-kpi-card--receivable">
+            <div class="min-w-0 space-y-1">
+                <p class="kpi-label !mt-0">Outstanding Receivables</p>
+                <p class="kpi-value !mt-0 text-xl leading-tight">NPR {{ kpis.outstanding_receivables }}</p>
+                <p class="kpi-note">Pending amount from unpaid sales</p>
+            </div>
         </div>
-        <div class="cf-kpi-card">
-            <p class="kpi-label">Overdue Invoices</p>
-            <p class="kpi-value">{{ kpis.overdue_count }}</p>
-            <p class="text-xs text-base-content/70">NPR {{ kpis.overdue_amount }}</p>
+        <div class="cf-kpi-card cf-kpi-card--overdue">
+            <div class="min-w-0 space-y-1">
+                <p class="kpi-label !mt-0">Overdue Invoices</p>
+                <p class="kpi-value !mt-0 text-xl leading-tight">{{ kpis.overdue_count }}</p>
+                <p class="text-xs text-base-content/70 leading-tight">NPR {{ kpis.overdue_amount }}</p>
+            </div>
         </div>
     </div>
 
@@ -64,15 +78,13 @@
                         {% for sale in recent_sales %}
                         <tr>
                             <td><a href="{% url 'sale_detail' sale.id %}" class="link link-primary">{{ sale.invoice_number }}</a></td>
-                            <td>{{ sale.customer.name }}</td>
+                            <td>{% if sale.customer %}{{ sale.customer.name }}{% else %}<span class="text-base-content/60">Unassigned</span>{% endif %}</td>
                             <td>NPR {{ sale.total_amount }}</td>
                             <td>
-                                {% if sale.received_total >= sale.total_amount %}
+                                {% if sale.status == 'paid' %}
                                 <span class="badge badge-success">Paid</span>
-                                {% elif sale.received_total > 0 %}
-                                <span class="badge badge-warning">Partial</span>
                                 {% else %}
-                                <span class="badge badge-error">Unpaid</span>
+                                <span class="badge badge-warning">Pending</span>
                                 {% endif %}
                             </td>
                         </tr>

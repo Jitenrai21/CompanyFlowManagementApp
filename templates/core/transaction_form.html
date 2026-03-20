@@ -14,12 +14,6 @@
         </div>
     </div>
 
-    {% if not has_customers %}
-    <div class="alert alert-warning">
-        <span>No customers found. Add at least one customer in admin before creating transactions.</span>
-    </div>
-    {% endif %}
-
     <form method="post" enctype="multipart/form-data" class="cf-section p-5 sm:p-6 space-y-4">
         {% csrf_token %}
 
@@ -36,11 +30,6 @@
                 {% if form.date.errors %}<p class="text-error text-sm mt-1">{{ form.date.errors|join:', ' }}</p>{% endif %}
             </div>
             <div class="form-control">
-                <label class="label" for="id_due_date"><span class="label-text">Due Date (optional)</span></label>
-                {{ form.due_date }}
-                {% if form.due_date.errors %}<p class="text-error text-sm mt-1">{{ form.due_date.errors|join:', ' }}</p>{% endif %}
-            </div>
-            <div class="form-control">
                 <label class="label" for="id_amount"><span class="label-text">Amount</span></label>
                 {{ form.amount }}
                 {% if form.amount.errors %}<p class="text-error text-sm mt-1">{{ form.amount.errors|join:', ' }}</p>{% endif %}
@@ -51,9 +40,9 @@
                 {% if form.type.errors %}<p class="text-error text-sm mt-1">{{ form.type.errors|join:', ' }}</p>{% endif %}
             </div>
             <div class="form-control">
-                <label class="label" for="id_status"><span class="label-text">Status</span></label>
-                {{ form.status }}
-                {% if form.status.errors %}<p class="text-error text-sm mt-1">{{ form.status.errors|join:', ' }}</p>{% endif %}
+                <label class="label" for="id_payment_method"><span class="label-text">Payment Method</span></label>
+                {{ form.payment_method }}
+                {% if form.payment_method.errors %}<p class="text-error text-sm mt-1">{{ form.payment_method.errors|join:', ' }}</p>{% endif %}
             </div>
             <div class="form-control md:col-span-2">
                 <label class="label" for="id_customer"><span class="label-text">Customer</span></label>

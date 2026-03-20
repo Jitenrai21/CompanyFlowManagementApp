@@ -10,9 +10,9 @@
                     <th>Date</th>
                     <th>Customer</th>
                     <th>Type</th>
+                    <th>Payment Method</th>
                     <th>Category</th>
                     <th>Amount</th>
-                    <th>Status</th>
                     <th>Attachment</th>
                     <th class="text-right">Actions</th>
                 </tr>
@@ -21,19 +21,15 @@
                 {% for transaction in transactions %}
                 <tr>
                     <td>{{ transaction.date }}</td>
-                    <td>{{ transaction.customer.name }}</td>
+                    <td>{% if transaction.customer %}{{ transaction.customer.name }}{% else %}<span class="text-base-content/50">Unassigned</span>{% endif %}</td>
                     <td>
                         <span class="badge {% if transaction.type == 'income' %}badge-success{% else %}badge-error{% endif %} badge-outline">
                             {{ transaction.get_type_display }}
                         </span>
                     </td>
+                    <td>{{ transaction.get_payment_method_display }}</td>
                     <td>{{ transaction.category }}</td>
                     <td>NPR {{ transaction.amount }}</td>
-                    <td>
-                        <span class="badge {% if transaction.status == 'paid' %}badge-success{% else %}badge-warning{% endif %}">
-                            {{ transaction.get_status_display }}
-                        </span>
-                    </td>
                     <td>
                         {% if transaction.attachment %}
                         <a href="{{ transaction.attachment.url }}" target="_blank" rel="noopener noreferrer" class="link link-primary">View</a>

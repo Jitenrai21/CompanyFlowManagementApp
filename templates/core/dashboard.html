@@ -14,7 +14,8 @@
             class="grid grid-cols-1 sm:grid-cols-3 gap-2"
             hx-get="{% url 'dashboard' %}"
             hx-target="#dashboard-content"
-            hx-trigger="change"
+            hx-trigger="change delay:300ms, submit"
+            hx-indicator="#dashboard-loading"
             hx-push-url="true"
         >
             <label class="form-control">
@@ -26,19 +27,38 @@
                 <input type="date" name="date_to" value="{{ filters.date_to }}" class="input input-bordered input-sm" aria-label="Filter to date" />
             </label>
             <div class="flex items-end">
-                <a href="{% url 'dashboard' %}" class="btn btn-outline btn-sm w-full">Reset</a>
+                <div class="grid w-full grid-cols-2 gap-2">
+                    <button type="submit" class="btn btn-primary btn-sm">Apply</button>
+                    <a href="{% url 'dashboard' %}" class="btn btn-outline btn-sm">Reset</a>
+                </div>
             </div>
         </form>
     </div>
     </div>
 
-    <div class="htmx-indicator">
-        <div class="cf-kpi-grid">
-            <div class="h-24 cf-skeleton"></div>
-            <div class="h-24 cf-skeleton"></div>
-            <div class="h-24 cf-skeleton"></div>
-            <div class="h-24 cf-skeleton"></div>
-            <div class="h-24 cf-skeleton"></div>
+    <div id="dashboard-loading" class="htmx-indicator">
+        <div class="grid grid-cols-5 gap-3">
+            <div class="cf-kpi-card h-24 flex flex-col justify-between">
+                <div class="h-2 w-20 cf-skeleton"></div>
+                <div class="h-7 w-28 cf-skeleton"></div>
+            </div>
+            <div class="cf-kpi-card h-24 flex flex-col justify-between">
+                <div class="h-2 w-24 cf-skeleton"></div>
+                <div class="h-7 w-32 cf-skeleton"></div>
+            </div>
+            <div class="cf-kpi-card h-24 flex flex-col justify-between">
+                <div class="h-2 w-24 cf-skeleton"></div>
+                <div class="h-7 w-28 cf-skeleton"></div>
+            </div>
+            <div class="cf-kpi-card h-24 flex flex-col justify-between">
+                <div class="h-2 w-28 cf-skeleton"></div>
+                <div class="h-7 w-32 cf-skeleton"></div>
+            </div>
+            <div class="cf-kpi-card h-24 flex flex-col justify-between">
+                <div class="h-2 w-24 cf-skeleton"></div>
+                <div class="h-6 w-14 cf-skeleton"></div>
+                <div class="h-2 w-20 cf-skeleton"></div>
+            </div>
         </div>
     </div>
 

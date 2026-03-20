@@ -21,6 +21,10 @@ from .models import (
 )
 
 
+AUTO_SALE_INCOME_CATEGORY = "Sale Income (Auto)"
+AUTO_SALE_INCOME_DESCRIPTION = "Auto-linked from paid sale"
+
+
 def _dashboard_base_sales_queryset(date_from="", date_to=""):
 	sales_queryset = Sale.objects.select_related("customer").annotate(
 		received_total=Coalesce(
@@ -51,21 +55,22 @@ def _build_alert_items(alert_type="", customer_id="", date_from="", date_to=""):
 	upcoming_end = today + timedelta(days=7)
 
 	sales_queryset = _sales_alert_queryset()
-	transactions_queryset = Transaction.objects.select_related("customer").filter(due_date__isnull=False)
 
 	if customer_id:
 		sales_queryset = sales_queryset.filter(customer_id=customer_id)
-		transactions_queryset = transactions_queryset.filter(customer_id=customer_id)
 	if date_from:
 		sales_queryset = sales_queryset.filter(due_date__gte=date_from)
-		transactions_queryset = transactions_queryset.filter(due_date__gte=date_from)
 	if date_to:
 		sales_queryset = sales_queryset.filter(due_date__lte=date_to)
-		transactions_queryset = transactions_queryset.filter(due_date__lte=date_to)
 
 	alert_items = []
 
 	for sale in sales_queryset:
+		if not sale.customer_id:
+			continue
+		if not sale.due_date:
+			continue
+
 		if sale.received_total >= sale.total_amount:
 			continue
 
@@ -90,34 +95,6 @@ def _build_alert_items(alert_type="", customer_id="", date_from="", date_to=""):
 				"amount": sale.total_amount - sale.received_total,
 				"status_label": sale.payment_status.title(),
 				"object_id": sale.id,
-			}
-		)
-
-	for transaction in transactions_queryset:
-		if transaction.status == RecordStatus.PAID:
-			continue
-
-		state = ""
-		if transaction.due_date < today:
-			state = AlertType.OVERDUE
-		elif today <= transaction.due_date <= upcoming_end:
-			state = AlertType.UPCOMING
-
-		if not state:
-			continue
-		if alert_type and state != alert_type:
-			continue
-
-		alert_items.append(
-			{
-				"state": state,
-				"source": AlertSource.TRANSACTION,
-				"due_date": transaction.due_date,
-				"customer": transaction.customer,
-				"title": transaction.category,
-				"amount": transaction.amount,
-				"status_label": transaction.get_status_display(),
-				"object_id": transaction.id,
 			}
 		)
 
@@ -193,7 +170,7 @@ def _dashboard_context(date_from="", date_to=""):
 	overdue_sales = [
 		sale
 		for sale in sales_rows
-		if sale.due_date < today and sale.total_amount > sale.received_total
+		if sale.due_date and sale.due_date < today and sale.total_amount > sale.received_total
 	]
 	overdue_count = len(overdue_sales)
 	overdue_amount = sum(
@@ -264,6 +241,52 @@ def _sync_sale_payment_fields(sale, total_received=None):
 	sale.save(update_fields=["paid_amount", "status", "updated_at"])
 
 
+def _sync_paid_sale_income_entry(sale):
+	auto_income_qs = Transaction.objects.filter(
+		sale=sale,
+		type=TransactionType.INCOME,
+		category=AUTO_SALE_INCOME_CATEGORY,
+	)
+
+	has_manual_income = sale.receipts.filter(type=TransactionType.INCOME).exclude(
+		category=AUTO_SALE_INCOME_CATEGORY
+	).exists()
+
+	if sale.status == RecordStatus.PAID and not has_manual_income:
+		auto_income = auto_income_qs.order_by("created_at").first()
+		description = f"{AUTO_SALE_INCOME_DESCRIPTION}: {sale.invoice_number}"
+
+		if auto_income:
+			auto_income.date = sale.date
+			auto_income.amount = sale.total_amount
+			auto_income.customer = sale.customer
+			auto_income.description = description
+			auto_income.save(
+				update_fields=[
+					"date",
+					"amount",
+					"customer",
+					"description",
+					"updated_at",
+				]
+			)
+			auto_income_qs.exclude(pk=auto_income.pk).delete()
+			return
+
+		Transaction.objects.create(
+			date=sale.date,
+			amount=sale.total_amount,
+			type=TransactionType.INCOME,
+			category=AUTO_SALE_INCOME_CATEGORY,
+			description=description,
+			customer=sale.customer,
+			sale=sale,
+		)
+		return
+
+	auto_income_qs.delete()
+
+
 def _sale_receipt_context(sale, form=None):
 	receipts = sale.receipts.filter(type=TransactionType.INCOME).order_by("date", "created_at")
 	receipt_rows = []
@@ -278,19 +301,19 @@ def _sale_receipt_context(sale, form=None):
 			}
 		)
 
-	payment_status = "unpaid"
-	if running_received >= sale.total_amount:
-		payment_status = "paid"
-	elif running_received > 0:
-		payment_status = "partial"
+	effective_received = sale.total_amount if sale.status == RecordStatus.PAID else running_received
+	remaining_balance = sale.total_amount - effective_received
+	if remaining_balance < 0:
+		remaining_balance = Decimal("0.00")
 
 	return {
 		"sale": sale,
+		"can_add_receipts": bool(sale.customer_id),
 		"receipt_rows": receipt_rows,
-		"receipt_form": form or SaleReceiptForm(initial={"status": RecordStatus.PAID}),
-		"total_received": running_received,
-		"remaining_balance": sale.total_amount - running_received,
-		"payment_status": payment_status,
+		"receipt_form": form or SaleReceiptForm(),
+		"total_received": effective_received,
+		"remaining_balance": remaining_balance,
+		"sale_status": sale.status,
 	}
 
 
@@ -419,16 +442,9 @@ def sales(request):
 		),
 	)
 	queryset = queryset.annotate(
-		payment_state=Case(
-			When(received_total__gte=F("total_amount"), then=Value("paid")),
-			When(received_total__lte=Decimal("0.00"), then=Value("unpaid")),
-			default=Value("partial"),
-			output_field=CharField(),
-		),
 		status_rank=Case(
-			When(received_total__gte=F("total_amount"), then=Value(3)),
-			When(received_total__lte=Decimal("0.00"), then=Value(1)),
-			default=Value(2),
+			When(status=RecordStatus.PAID, then=Value(2)),
+			default=Value(1),
 			output_field=IntegerField(),
 		),
 		remaining_balance=F("total_amount") - F("received_total"),
@@ -448,7 +464,7 @@ def sales(request):
 			| Q(customer__name__icontains=query)
 		)
 	if status:
-		queryset = queryset.filter(payment_state=status)
+		queryset = queryset.filter(status=status)
 	if customer_id:
 		queryset = queryset.filter(customer_id=customer_id)
 	if date_from:
@@ -489,9 +505,9 @@ def sale_create(request):
 		form = SaleForm(request.POST)
 		if form.is_valid():
 			sale = form.save(commit=False)
-			sale.paid_amount = Decimal("0.00")
-			sale.status = RecordStatus.PENDING
+			sale.paid_amount = sale.total_amount if sale.status == RecordStatus.PAID else Decimal("0.00")
 			sale.save()
+			_sync_paid_sale_income_entry(sale)
 			messages.success(request, "Sale created successfully.")
 			return redirect("sale_detail", pk=sale.pk)
 		messages.error(request, "Please fix the errors below.")
@@ -517,8 +533,17 @@ def sale_edit(request, pk):
 	if request.method == "POST":
 		form = SaleForm(request.POST, instance=sale)
 		if form.is_valid():
-			sale = form.save()
-			_sync_sale_payment_fields(sale)
+			sale = form.save(commit=False)
+			sale.save()
+			_sync_paid_sale_income_entry(sale)
+			if sale.status == RecordStatus.PAID:
+				sale.paid_amount = sale.total_amount
+			else:
+				summary = sale.receipts.filter(type=TransactionType.INCOME).aggregate(
+					total=Coalesce(Sum("amount"), Value(Decimal("0.00")))
+				)
+				sale.paid_amount = summary["total"]
+			sale.save(update_fields=["paid_amount", "updated_at"])
 			messages.success(request, "Sale updated successfully.")
 			return redirect("sale_detail", pk=sale.pk)
 		messages.error(request, "Please fix the errors below.")
@@ -552,6 +577,13 @@ def sale_receipt_create(request, pk):
 	if request.method != "POST":
 		return redirect("sale_detail", pk=sale.pk)
 
+	if not sale.customer_id:
+		messages.error(request, "Assign a customer to this sale before adding receipts.")
+		context = _sale_receipt_context(sale)
+		if request.headers.get("HX-Request"):
+			return render(request, "core/partials/sale_receipts_panel.html", context, status=400)
+		return render(request, "core/sale_detail.html", context, status=400)
+
 	form = SaleReceiptForm(request.POST)
 	if form.is_valid():
 		receipt = form.save(commit=False)
@@ -561,6 +593,8 @@ def sale_receipt_create(request, pk):
 		if not receipt.category:
 			receipt.category = "Sales Receipt"
 		receipt.save()
+		_sync_sale_payment_fields(sale)
+		_sync_paid_sale_income_entry(sale)
 		_sync_sale_payment_fields(sale)
 		messages.success(request, "Cash receipt added to sale.")
 
