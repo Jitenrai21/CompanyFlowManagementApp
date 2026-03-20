@@ -1,17 +1,17 @@
 {% extends 'base.html' %}
 
-{% block title %}Alerts | Company Flow{% endblock %}
+{% block title %}Alerts | Purba Paschim Construction and Suppliers Company Flow{% endblock %}
 
 {% block content %}
-<div class="space-y-7">
-    <div>
-        <h1 class="text-3xl font-extrabold tracking-tight">Notifications & Timeline Alerts</h1>
-        <p class="text-base-content/70 mt-1">Track overdue and upcoming sales or transactions due within the next seven days.</p>
+<div class="space-y-6">
+    <div class="cf-page-header">
+        <h1 class="text-3xl font-extrabold tracking-tight">Notifications and Timeline Alerts</h1>
+        <p class="cf-page-subtitle">Track overdue and upcoming sales or transactions due within the next seven days.</p>
     </div>
 
     <form
         method="get"
-        class="card bg-base-100 border border-base-300 p-4 sm:p-5 grid gap-3 md:grid-cols-2 lg:grid-cols-5"
+        class="cf-filter-panel grid gap-3 md:grid-cols-2 lg:grid-cols-4"
         hx-get="{% url 'alerts' %}"
         hx-target="#alerts-content"
         hx-trigger="change"
@@ -42,9 +42,9 @@
             <span class="label-text mb-1">To</span>
             <input type="date" name="date_to" value="{{ filters.date_to }}" class="input input-bordered w-full" />
         </label>
-        <div class="flex items-end gap-2">
-            <button class="btn btn-outline w-full" type="submit">Apply</button>
-            <a href="{% url 'alerts' %}" class="btn btn-ghost">Reset</a>
+        <div class="md:col-span-2 lg:col-span-4 flex flex-wrap gap-2 pt-1">
+            <button class="btn btn-outline btn-sm" type="submit">Apply Filters</button>
+            <a href="{% url 'alerts' %}" class="btn btn-ghost btn-sm">Reset</a>
         </div>
     </form>
 

@@ -1,13 +1,14 @@
 {% extends 'base.html' %}
 
-{% block title %}Dashboard | Company Flow{% endblock %}
+{% block title %}Dashboard | Purba Paschim Construction and Suppliers Company Flow{% endblock %}
 
 {% block content %}
-<div class="space-y-7">
-    <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+<div class="space-y-6">
+    <div class="cf-page-header">
+        <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div>
             <h1 class="text-3xl font-extrabold tracking-tight">Dashboard</h1>
-            <p class="text-base-content/70 mt-1">KPI overview, trends, and recent activity in one place.</p>
+            <p class="cf-page-subtitle">KPI overview, trends, and recent activity in one place.</p>
         </div>
         <form
             class="grid grid-cols-1 sm:grid-cols-3 gap-2"
@@ -29,14 +30,15 @@
             </div>
         </form>
     </div>
+    </div>
 
     <div class="htmx-indicator">
-        <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-5 animate-pulse">
-            <div class="h-24 rounded-xl bg-base-300/60"></div>
-            <div class="h-24 rounded-xl bg-base-300/60"></div>
-            <div class="h-24 rounded-xl bg-base-300/60"></div>
-            <div class="h-24 rounded-xl bg-base-300/60"></div>
-            <div class="h-24 rounded-xl bg-base-300/60"></div>
+        <div class="cf-kpi-grid">
+            <div class="h-24 cf-skeleton"></div>
+            <div class="h-24 cf-skeleton"></div>
+            <div class="h-24 cf-skeleton"></div>
+            <div class="h-24 cf-skeleton"></div>
+            <div class="h-24 cf-skeleton"></div>
         </div>
     </div>
 

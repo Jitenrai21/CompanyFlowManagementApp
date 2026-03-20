@@ -1,18 +1,20 @@
 {% extends 'base.html' %}
 
-{% block title %}{{ form_title }} | Company Flow{% endblock %}
+{% block title %}{{ form_title }} | Purba Paschim Construction and Suppliers Company Flow{% endblock %}
 
 {% block content %}
 <div class="max-w-3xl space-y-6">
-    <div class="flex items-center justify-between gap-3">
-        <div>
-            <h1 class="text-3xl font-extrabold tracking-tight">{{ form_title }}</h1>
-            <p class="text-sm text-base-content/70 mt-1">Create or update customer records used across transactions and sales.</p>
+    <div class="cf-page-header">
+        <div class="flex items-center justify-between gap-3">
+            <div>
+                <h1 class="text-3xl font-extrabold tracking-tight">{{ form_title }}</h1>
+                <p class="cf-page-subtitle">Create or update customer records used across transactions and sales.</p>
+            </div>
+            <a href="{% url 'customers' %}" class="btn btn-outline">Back to List</a>
         </div>
-        <a href="{% url 'customers' %}" class="btn btn-outline">Back to List</a>
     </div>
 
-    <form method="post" class="card bg-base-100 border border-base-300 p-5 sm:p-6 space-y-4">
+    <form method="post" class="cf-section p-5 sm:p-6 space-y-4">
         {% csrf_token %}
 
         {% if form.non_field_errors %}

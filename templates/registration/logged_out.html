@@ -1,13 +1,18 @@
 {% extends 'base.html' %}
 
-{% block title %}Logged Out | Company Flow{% endblock %}
+{% block title %}Logged Out | Purba Paschim Construction and Suppliers Company Flow{% endblock %}
 
 {% block auth_content %}
-<div class="card w-full max-w-md bg-base-100 shadow-lg border border-base-300">
-    <div class="card-body text-center p-6 sm:p-7">
+<div class="w-full max-w-3xl grid gap-4 md:grid-cols-[1.2fr_1fr]">
+    <section class="cf-section p-6 sm:p-7">
         <h1 class="text-3xl font-extrabold tracking-tight">You are logged out</h1>
-        <p class="text-base-content/70">Your session has ended successfully.</p>
-        <a href="{% url 'login' %}" class="btn btn-primary mt-4">Login again</a>
-    </div>
+        <p class="text-base-content/70 mt-2">Your session has ended successfully and your workspace is secure.</p>
+        <div class="divider"></div>
+        <p class="text-sm text-base-content/75">Sign in again whenever you are ready to continue managing entries, sales, and customer records.</p>
+    </section>
+    <section class="cf-section p-6 sm:p-7 flex flex-col justify-center">
+        <p class="text-sm text-base-content/70 mb-3">Need to jump back in?</p>
+        <a href="{% url 'login' %}" class="btn btn-primary w-full">Login again</a>
+    </section>
 </div>
 {% endblock %}

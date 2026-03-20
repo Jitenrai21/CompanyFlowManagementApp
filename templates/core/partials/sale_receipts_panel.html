@@ -1,8 +1,11 @@
 <div id="sale-receipts-panel" class="grid gap-5 xl:grid-cols-3">
-    <div class="card bg-base-100 border border-base-300 xl:col-span-2 overflow-hidden">
-        <div class="card-body pb-0">
-            <h2 class="card-title text-xl">Linked Cash Receipts</h2>
-            <p class="text-sm text-base-content/70">Running balance is calculated after each receipt.</p>
+    <div class="cf-table-shell xl:col-span-2">
+        <div class="cf-table-head">
+            <div>
+                <h2 class="font-semibold">Linked Cash Receipts</h2>
+                <p class="text-xs text-base-content/70">Running balance is calculated after each receipt.</p>
+            </div>
+            <span class="text-xs text-base-content/60">{{ receipt_rows|length }} receipt{{ receipt_rows|length|pluralize }}</span>
         </div>
         <div class="overflow-x-auto">
             <table class="table table-zebra">
@@ -30,7 +33,12 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="5" class="text-center py-6 text-base-content/60">No linked receipts yet.</td>
+                        <td colspan="5" class="py-0">
+                            <div class="cf-empty">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h8a1 1 0 110 2H4a1 1 0 01-1-1zm1 3a1 1 0 100 2h12a1 1 0 100-2H4z" /></svg>
+                                <p>No linked receipts yet.</p>
+                            </div>
+                        </td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -38,7 +46,7 @@
         </div>
     </div>
 
-    <div class="card bg-base-100 border border-base-300">
+    <div class="cf-section">
         <div class="card-body">
             <h2 class="card-title text-xl">Add Cash Receipt</h2>
             {% if inline_success %}

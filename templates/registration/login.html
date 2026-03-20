@@ -1,23 +1,33 @@
 {% extends 'base.html' %}
 
-{% block title %}Login | Company Flow{% endblock %}
+{% block title %}Login | Purba Paschim Construction and Suppliers Company Flow{% endblock %}
 
 {% block auth_content %}
-<div class="card w-full max-w-md bg-base-100 shadow-xl border border-base-300">
-    <div class="card-body p-6 sm:p-7">
-        <h1 class="card-title text-3xl font-extrabold tracking-tight">Welcome Back</h1>
-        <p class="text-sm text-base-content/70">Sign in to manage your supplier cash flow.</p>
+<div class="w-full max-w-4xl grid gap-4 md:grid-cols-2">
+    <section class="cf-section p-6 sm:p-7">
+        <h1 class="text-3xl font-extrabold tracking-tight">Welcome Back</h1>
+        <p class="text-sm text-base-content/70 mt-2">Sign in to manage company cash flow, customer balances, and active alerts.</p>
+        <div class="divider"></div>
+        <ul class="space-y-2 text-sm text-base-content/75">
+            <li>Track sales and receipts in one timeline.</li>
+            <li>Monitor overdue balances and upcoming dues.</li>
+            <li>Keep customer records and transaction history aligned.</li>
+        </ul>
+    </section>
+
+    <section class="cf-section p-6 sm:p-7">
+        <h2 class="text-xl font-bold">Account Login</h2>
         {% if form.errors %}
-        <div class="alert alert-error mt-2">
+        <div class="alert alert-error mt-3">
             <span>Invalid username or password. Please try again.</span>
         </div>
         {% endif %}
         {% if next %}
-        <div class="alert alert-info mt-2">
+        <div class="alert alert-info mt-3">
             <span>Please log in to continue.</span>
         </div>
         {% endif %}
-        <form method="post" class="space-y-4 mt-3" aria-label="Login form">
+        <form method="post" class="space-y-4 mt-4" aria-label="Login form">
             {% csrf_token %}
             <div class="form-control">
                 <label class="label" for="id_username"><span class="label-text">Username</span></label>
@@ -30,6 +40,6 @@
             <button type="submit" class="btn btn-primary w-full">Sign in</button>
             <input type="hidden" name="next" value="{{ next }}" />
         </form>
-    </div>
+    </section>
 </div>
 {% endblock %}

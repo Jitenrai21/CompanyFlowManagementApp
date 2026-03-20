@@ -4,10 +4,11 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{% block title %}Company Flow{% endblock %}</title>
+    <title>{% block title %}Purba Paschim Construction and Suppliers Company Flow{% endblock %}</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="icon" type="image/png" href="{% static 'core/CompanyLogo.png' %}">
     <script>
         tailwind = window.tailwind || {};
         tailwind.config = {
@@ -41,8 +42,20 @@
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7" /></svg>
                     </label>
                 </div>
-                <div class="flex-1">
-                    <a href="{% url 'dashboard' %}" class="btn btn-ghost text-lg font-extrabold tracking-tight">Company Flow</a>
+                <div class="flex-1 min-w-0">
+                    <a href="{% url 'dashboard' %}" class="inline-flex items-center gap-3 rounded-lg px-2 py-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
+                        <span class="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden sm:h-16 sm:w-16" aria-hidden="true">
+                            <img
+                                src="{% static 'core/CompanyLogo.png' %}"
+                                alt="Purba Paschim Construction and Suppliers logo"
+                                class="cf-brand-logo h-full w-full object-contain"
+                            >
+                        </span>
+                        <span class="min-w-0">
+                            <span class="block truncate text-sm font-extrabold tracking-tight sm:text-base lg:text-lg">Purba Paschim Construction and Suppliers</span>
+                            <span class="block text-[11px] text-base-content/60 sm:text-xs">Company Flow</span>
+                        </span>
+                    </a>
                 </div>
                 <div class="flex-none gap-2">
                     <span class="hidden sm:inline text-sm text-base-content/70">{{ request.user.username }}</span>
@@ -62,18 +75,60 @@
                     {% endfor %}
                 </div>
                 {% endif %}
-                {% block content %}{% endblock %}
+                <div class="cf-page-shell">
+                    {% block content %}{% endblock %}
+                </div>
             </main>
+            <footer class="cf-footer px-4 py-4 sm:px-6">
+                <div class="cf-footer-inner">
+                    <div class="cf-footer-brand">
+                        <img src="{% static 'core/CompanyLogo.png' %}" alt="Purba Paschim Construction and Suppliers logo" class="cf-footer-logo">
+                        <div>
+                            <p class="cf-footer-title">Purba Paschim Construction and Suppliers</p>
+                            <p class="cf-footer-subtitle">Company Flow</p>
+                        </div>
+                    </div>
+                    <p class="cf-footer-copy">Operational finance workspace for transparent daily control.</p>
+                </div>
+            </footer>
         </div>
         <div class="drawer-side">
             <label for="app-drawer" aria-label="close sidebar" class="drawer-overlay"></label>
             <aside class="cf-sidebar min-h-full w-72 p-4">
                 <h2 class="px-3 text-sm font-semibold uppercase tracking-wider text-base-content/60">Navigation</h2>
                 <ul class="menu mt-2 gap-1">
-                    <li><a href="{% url 'dashboard' %}" class="{% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">Dashboard</a></li>
-                    <li><a href="{% url 'cash_entries' %}" class="{% if '/cash-entries' in request.path %}active{% endif %}">Cash Entries</a></li>
-                    <li><a href="{% url 'sales' %}" class="{% if '/sales' in request.path %}active{% endif %}">Sales</a></li>
-                    <li><a href="{% url 'customers' %}" class="{% if '/customers' in request.path %}active{% endif %}">Customers</a></li>
+                    <li>
+                        <a href="{% url 'dashboard' %}" class="{% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">
+                            <span class="inline-flex items-center gap-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M10 3a1 1 0 01.707.293l6 6a1 1 0 01-1.414 1.414L15 10.414V16a1 1 0 01-1 1h-3v-4H9v4H6a1 1 0 01-1-1v-5.586l-.293.293a1 1 0 11-1.414-1.414l6-6A1 1 0 0110 3z" /></svg>
+                                <span>Dashboard</span>
+                            </span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="{% url 'cash_entries' %}" class="{% if '/cash-entries' in request.path %}active{% endif %}">
+                            <span class="inline-flex items-center gap-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h8a1 1 0 110 2H4a1 1 0 01-1-1zm1 3a1 1 0 100 2h12a1 1 0 100-2H4z" /></svg>
+                                <span>Cash Entries</span>
+                            </span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="{% url 'sales' %}" class="{% if '/sales' in request.path %}active{% endif %}">
+                            <span class="inline-flex items-center gap-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M4 3a1 1 0 000 2h12a1 1 0 100-2H4zm-1 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm1 3a1 1 0 100 2h5a1 1 0 100-2H4zm8 0a1 1 0 000 2h4a1 1 0 100-2h-4z" /></svg>
+                                <span>Sales</span>
+                            </span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="{% url 'customers' %}" class="{% if '/customers' in request.path %}active{% endif %}">
+                            <span class="inline-flex items-center gap-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M10 3a4 4 0 110 8 4 4 0 010-8zm-7 13a7 7 0 1114 0H3z" /></svg>
+                                <span>Customers</span>
+                            </span>
+                        </a>
+                    </li>
                     <li>
                         <a href="{% url 'alerts' %}" class="{% if '/alerts' in request.path %}active{% endif %}">
                             <span class="inline-flex items-center gap-2">
@@ -97,8 +152,22 @@
     {% else %}
     <main class="cf-auth-shell min-h-screen flex items-center justify-center p-4">
         <div class="cf-auth-backdrop"></div>
-        <div class="relative z-10 w-full flex items-center justify-center">
-            {% block auth_content %}{% endblock %}
+        <div class="relative z-10 w-full space-y-4">
+            <div class="w-full flex items-center justify-center">
+                {% block auth_content %}{% endblock %}
+            </div>
+            <footer class="cf-footer cf-footer-auth px-4 py-4 sm:px-6">
+                <div class="cf-footer-inner">
+                    <div class="cf-footer-brand">
+                        <img src="{% static 'core/CompanyLogo.png' %}" alt="Purba Paschim Construction and Suppliers logo" class="cf-footer-logo">
+                        <div>
+                            <p class="cf-footer-title">Purba Paschim Construction and Suppliers</p>
+                            <p class="cf-footer-subtitle">Company Flow</p>
+                        </div>
+                    </div>
+                    <p class="cf-footer-copy">Operational finance workspace for transparent daily control.</p>
+                </div>
+            </footer>
         </div>
     </main>
     {% endif %}

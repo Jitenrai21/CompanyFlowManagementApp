@@ -1,46 +1,36 @@
-<div class="space-y-7">
-    <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-        <div class="card bg-base-100 border border-base-300">
-            <div class="card-body p-4">
-                <p class="text-[11px] uppercase tracking-[0.16em] text-base-content/60">Total Sales</p>
-                <p class="text-2xl font-semibold">NPR {{ kpis.total_sales }}</p>
-            </div>
+<div class="space-y-6">
+    <div class="cf-kpi-grid">
+        <div class="cf-kpi-card">
+            <p class="kpi-label">Total Sales</p>
+            <p class="kpi-value">NPR {{ kpis.total_sales }}</p>
         </div>
-        <div class="card bg-base-100 border border-base-300">
-            <div class="card-body p-4">
-                <p class="text-[11px] uppercase tracking-[0.16em] text-base-content/60">Total Income</p>
-                <p class="text-2xl font-semibold text-success">NPR {{ kpis.total_income }}</p>
-            </div>
+        <div class="cf-kpi-card">
+            <p class="kpi-label">Total Income</p>
+            <p class="kpi-value text-success">NPR {{ kpis.total_income }}</p>
         </div>
-        <div class="card bg-base-100 border border-base-300">
-            <div class="card-body p-4">
-                <p class="text-[11px] uppercase tracking-[0.16em] text-base-content/60">Total Expenses</p>
-                <p class="text-2xl font-semibold text-error">NPR {{ kpis.total_expenses }}</p>
-            </div>
+        <div class="cf-kpi-card">
+            <p class="kpi-label">Total Expenses</p>
+            <p class="kpi-value text-error">NPR {{ kpis.total_expenses }}</p>
         </div>
-        <div class="card bg-base-100 border border-base-300">
-            <div class="card-body p-4">
-                <p class="text-[11px] uppercase tracking-[0.16em] text-base-content/60">Outstanding Receivables</p>
-                <p class="text-2xl font-semibold">NPR {{ kpis.outstanding_receivables }}</p>
-            </div>
+        <div class="cf-kpi-card">
+            <p class="kpi-label">Outstanding Receivables</p>
+            <p class="kpi-value">NPR {{ kpis.outstanding_receivables }}</p>
         </div>
-        <div class="card bg-base-100 border border-base-300">
-            <div class="card-body p-4">
-                <p class="text-[11px] uppercase tracking-[0.16em] text-base-content/60">Overdue Invoices</p>
-                <p class="text-2xl font-semibold">{{ kpis.overdue_count }}</p>
-                <p class="text-xs text-base-content/70">NPR {{ kpis.overdue_amount }}</p>
-            </div>
+        <div class="cf-kpi-card">
+            <p class="kpi-label">Overdue Invoices</p>
+            <p class="kpi-value">{{ kpis.overdue_count }}</p>
+            <p class="text-xs text-base-content/70">NPR {{ kpis.overdue_amount }}</p>
         </div>
     </div>
 
     <div class="grid gap-4 xl:grid-cols-3">
-        <div class="card bg-base-100 border border-base-300 xl:col-span-2">
+        <div class="cf-section xl:col-span-2">
             <div class="card-body">
                 <h2 class="card-title text-xl">Sales Trend</h2>
                 <div class="h-72"><canvas id="sales-trend-chart"></canvas></div>
             </div>
         </div>
-        <div class="card bg-base-100 border border-base-300">
+        <div class="cf-section">
             <div class="card-body">
                 <h2 class="card-title text-xl">Income vs Expense</h2>
                 <div class="h-72"><canvas id="income-expense-chart"></canvas></div>
@@ -48,7 +38,7 @@
         </div>
     </div>
 
-    <div class="card bg-base-100 border border-base-300">
+    <div class="cf-section">
         <div class="card-body">
             <h2 class="card-title text-xl">Top Customers by Sales</h2>
             <div class="h-72"><canvas id="top-customers-chart"></canvas></div>
@@ -56,7 +46,7 @@
     </div>
 
     <div class="grid gap-4 xl:grid-cols-3">
-        <div class="card bg-base-100 border border-base-300 overflow-hidden">
+        <div class="cf-table-shell">
             <div class="card-body pb-0">
                 <h2 class="card-title">Recent Sales</h2>
             </div>
@@ -87,14 +77,21 @@
                             </td>
                         </tr>
                         {% empty %}
-                        <tr><td colspan="4" class="text-center py-6 text-base-content/60">No sales available.</td></tr>
+                        <tr>
+                            <td colspan="4" class="py-0">
+                                <div class="cf-empty">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 5a1 1 0 011-1h7a1 1 0 110 2H4a1 1 0 01-1-1zm1 4a1 1 0 100 2h12a1 1 0 100-2H4z" /></svg>
+                                    <p>No sales available for this period.</p>
+                                </div>
+                            </td>
+                        </tr>
                         {% endfor %}
                     </tbody>
                 </table>
             </div>
         </div>
 
-        <div class="card bg-base-100 border border-base-300 overflow-hidden">
+        <div class="cf-table-shell">
             <div class="card-body pb-0">
                 <h2 class="card-title">Recent Cash Entries</h2>
             </div>
@@ -115,14 +112,21 @@
                             <td>NPR {{ tx.amount }}</td>
                         </tr>
                         {% empty %}
-                        <tr><td colspan="3" class="text-center py-6 text-base-content/60">No transactions available.</td></tr>
+                        <tr>
+                            <td colspan="3" class="py-0">
+                                <div class="cf-empty">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M10 2a1 1 0 011 1v1.07a7.002 7.002 0 015.93 5.93H18a1 1 0 110 2h-1.07a7.002 7.002 0 01-5.93 5.93V19a1 1 0 11-2 0v-1.07a7.002 7.002 0 01-5.93-5.93H2a1 1 0 110-2h1.07a7.002 7.002 0 015.93-5.93V3a1 1 0 011-1z" /></svg>
+                                    <p>No transactions available for this period.</p>
+                                </div>
+                            </td>
+                        </tr>
                         {% endfor %}
                     </tbody>
                 </table>
             </div>
         </div>
 
-        <div class="card bg-base-100 border border-base-300 overflow-hidden">
+        <div class="cf-table-shell">
             <div class="card-body pb-0">
                 <h2 class="card-title">New Customers</h2>
             </div>
@@ -143,7 +147,14 @@
                             <td>{{ customer.created_at|date:'Y-m-d' }}</td>
                         </tr>
                         {% empty %}
-                        <tr><td colspan="3" class="text-center py-6 text-base-content/60">No customers available.</td></tr>
+                        <tr>
+                            <td colspan="3" class="py-0">
+                                <div class="cf-empty">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M10 3a4 4 0 110 8 4 4 0 010-8zm-7 13a7 7 0 1114 0H3z" /></svg>
+                                    <p>No new customers available for this period.</p>
+                                </div>
+                            </td>
+                        </tr>
                         {% endfor %}
                     </tbody>
                 </table>
