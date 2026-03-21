@@ -42,6 +42,7 @@ class CustomerForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         for field_name, field in self.fields.items():
             _decorate_widget(field_name, field)
+        self.fields["address"].widget.attrs["rows"] = 1
 
 
 class SaleForm(forms.ModelForm):

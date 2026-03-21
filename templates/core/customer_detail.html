@@ -31,11 +31,7 @@
                 </div>
             </div>
         </div>
-        <div class="grid gap-4">
-            <div class="cf-kpi-card"><p class="kpi-label">Total Income</p><p class="kpi-value">NPR {{ total_income }}</p></div>
-            <div class="cf-kpi-card"><p class="kpi-label">Total Expense</p><p class="kpi-value">NPR {{ total_expense }}</p></div>
-            <div class="cf-kpi-card"><p class="kpi-label">Sales Count</p><p class="kpi-value">{{ sales|length }}</p></div>
-        </div>
+        {% include 'core/partials/customer_payment_section.html' %}
     </div>
 
     <div class="grid gap-4 xl:grid-cols-2">
@@ -60,21 +56,23 @@
             </div>
         </div>
 
-        <div class="cf-table-shell">
+        <div class="cf-table-shell" id="customer-sales-table-section">
             <div class="cf-table-head"><h2 class="font-semibold">Linked Sales</h2></div>
             <div class="overflow-x-auto">
                 <table class="table table-zebra">
-                    <thead><tr><th>Invoice</th><th>Date</th><th>Total</th><th>Status</th></tr></thead>
+                    <thead><tr><th>Invoice</th><th>Date</th><th>Total</th><th>Paid</th><th>Due</th><th>Status</th></tr></thead>
                     <tbody>
-                        {% for sale in sales %}
+                        {% for row in sales_rows %}
                         <tr>
-                            <td>{{ sale.invoice_number }}</td>
-                            <td>{{ sale.date }}</td>
-                            <td>NPR {{ sale.total_amount }}</td>
-                            <td>{{ sale.get_status_display }}</td>
+                            <td>{{ row.sale.invoice_number }}</td>
+                            <td>{{ row.sale.date }}</td>
+                            <td>NPR {{ row.sale.total_amount }}</td>
+                            <td>NPR {{ row.sale.paid_amount }}</td>
+                            <td>NPR {{ row.due_amount }}</td>
+                            <td>{{ row.sale.get_status_display }}</td>
                         </tr>
                         {% empty %}
-                        <tr><td colspan="4" class="py-0"><div class="cf-empty"><p>No linked sales yet.</p></div></td></tr>
+                        <tr><td colspan="6" class="py-0"><div class="cf-empty"><p>No linked sales yet.</p></div></td></tr>
                         {% endfor %}
                     </tbody>
                 </table>

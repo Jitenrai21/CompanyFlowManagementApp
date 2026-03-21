@@ -48,6 +48,7 @@ class Customer(TimeStampedModel):
         default=CustomerType.REGULAR,
     )
     opening_balance = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    credit_balance = models.DecimalField(max_digits=14, decimal_places=2, default=0)
 
     class Meta:
         ordering = ["name"]
@@ -197,3 +198,61 @@ class AlertNotification(TimeStampedModel):
 
     def __str__(self) -> str:
         return f"{self.get_alert_type_display()} {self.get_source_type_display()} #{self.source_id}"
+
+
+class CustomerPayment(TimeStampedModel):
+    customer = models.ForeignKey(
+        Customer,
+        on_delete=models.CASCADE,
+        related_name="customer_payments",
+    )
+    payment_date = models.DateField(default=timezone.now)
+    amount = models.DecimalField(max_digits=14, decimal_places=2)
+    payment_method = models.CharField(
+        max_length=20,
+        choices=PaymentMethod.choices,
+        default=PaymentMethod.CASH,
+    )
+    allocated_amount = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    unallocated_amount = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    notes = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ["-payment_date", "-created_at"]
+        indexes = [
+            models.Index(fields=["customer", "payment_date"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"Payment {self.customer.name} {self.amount} on {self.payment_date}"
+
+
+class PaymentAllocation(TimeStampedModel):
+    customer_payment = models.ForeignKey(
+        CustomerPayment,
+        on_delete=models.CASCADE,
+        related_name="allocations",
+    )
+    sale = models.ForeignKey(
+        Sale,
+        on_delete=models.CASCADE,
+        related_name="payment_allocations",
+    )
+    transaction = models.ForeignKey(
+        Transaction,
+        on_delete=models.SET_NULL,
+        related_name="payment_allocations",
+        null=True,
+        blank=True,
+    )
+    amount = models.DecimalField(max_digits=14, decimal_places=2)
+
+    class Meta:
+        ordering = ["created_at"]
+        indexes = [
+            models.Index(fields=["sale"]),
+            models.Index(fields=["customer_payment"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.sale.invoice_number} <- {self.amount}"

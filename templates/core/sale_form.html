@@ -60,6 +60,22 @@
                             <tbody id="sale-items-body"></tbody>
                         </table>
                     </div>
+                    <datalist id="sale-item-options">
+                        <option value="Cement - PPC"></option>
+                        <option value="Cement - OPC"></option>
+                        <option value="Baluwa (Plaster)"></option>
+                        <option value="Baluwa (Crusher)"></option>
+                        <option value="Baluwa"></option>
+                        <option value="Roda"></option>
+                        <option value="JCB"></option>
+                        <option value="Itta - Bhk"></option>
+                        <option value="Itta - Tukra"></option>
+                        <option value="Itta"></option>
+                        <option value="Rod"></option>
+                        <option value="Chibs"></option>
+                        <option value="Dust"></option>
+                        <option value="Block"></option>
+                    </datalist>
                     <button type="button" class="btn btn-sm btn-outline" id="add-sale-item-btn">Add Item</button>
                 </div>
                 {% if form.items.errors %}<p class="text-error text-sm mt-1">{{ form.items.errors|join:', ' }}</p>{% endif %}
@@ -127,7 +143,7 @@
             const row = document.createElement('tr');
             row.innerHTML = `
                 <td>
-                    <input type="text" class="input input-bordered input-sm w-full" data-item-name placeholder="Item name">
+                    <input type="text" list="sale-item-options" class="input input-bordered input-sm w-full" data-item-name placeholder="Item name">
                 </td>
                 <td>
                     <input type="number" min="1" step="1" inputmode="numeric" class="input input-bordered input-sm w-full text-right" data-item-quantity placeholder="1" value="1">

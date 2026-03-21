@@ -15,6 +15,11 @@ urlpatterns = [
     path("customers/", views.customers, name="customers"),
     path("customers/new/", views.customer_create, name="customer_create"),
     path("customers/<int:pk>/", views.customer_detail, name="customer_detail"),
+    path(
+        "customers/<int:pk>/allocate-payment/",
+        views.customer_allocate_payment,
+        name="customer_allocate_payment",
+    ),
     path("customers/<int:pk>/edit/", views.customer_edit, name="customer_edit"),
     path("alerts/", views.alerts, name="alerts"),
     path("alerts/badge/", views.alerts_badge, name="alerts_badge"),

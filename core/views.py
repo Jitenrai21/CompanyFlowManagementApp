@@ -3,6 +3,7 @@ from datetime import timedelta
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.db import transaction as db_transaction
 from django.db.models import Case, CharField, F, IntegerField, Q, Sum, Value, When
 from django.db.models.functions import Coalesce
 from django.shortcuts import get_object_or_404, redirect, render
@@ -14,6 +15,9 @@ from .models import (
 	AlertSource,
 	AlertType,
 	Customer,
+	CustomerPayment,
+	PaymentAllocation,
+	PaymentMethod,
 	RecordStatus,
 	Sale,
 	Transaction,
@@ -23,6 +27,7 @@ from .models import (
 
 AUTO_SALE_INCOME_CATEGORY = "Sale Income (Auto)"
 AUTO_SALE_INCOME_DESCRIPTION = "Auto-linked from paid sale"
+PAYMENT_ALLOCATION_CATEGORY = "Sales Payment Allocation"
 
 
 def _dashboard_base_sales_queryset(date_from="", date_to=""):
@@ -314,6 +319,56 @@ def _sale_receipt_context(sale, form=None):
 		"total_received": effective_received,
 		"remaining_balance": remaining_balance,
 		"sale_status": sale.status,
+	}
+
+
+def _customer_payment_context(customer):
+	sales = customer.sales.all().order_by("-date", "-created_at")
+	pending_sales = (
+		customer.sales.filter(status=RecordStatus.PENDING)
+		.order_by("date", "created_at", "id")
+	)
+	sales_rows = []
+	for sale in sales:
+		due_amount = sale.total_amount - sale.paid_amount
+		if due_amount < 0:
+			due_amount = Decimal("0.00")
+		sales_rows.append(
+			{
+				"sale": sale,
+				"due_amount": due_amount,
+			}
+		)
+
+	pending_sales_rows = []
+	for sale in pending_sales:
+		due_amount = sale.total_amount - sale.paid_amount
+		if due_amount <= 0:
+			continue
+		pending_sales_rows.append(
+			{
+				"sale": sale,
+				"due_amount": due_amount,
+			}
+		)
+
+	payment_totals = sales.aggregate(
+		total_sales=Coalesce(Sum("total_amount"), Value(Decimal("0.00"))),
+		total_paid=Coalesce(Sum("paid_amount"), Value(Decimal("0.00"))),
+	)
+	due_amount = payment_totals["total_sales"] - payment_totals["total_paid"]
+	if due_amount < 0:
+		due_amount = Decimal("0.00")
+
+	return {
+		"sales": sales,
+		"sales_rows": sales_rows,
+		"pending_sales": pending_sales,
+		"pending_sales_rows": pending_sales_rows,
+		"total_payment": payment_totals["total_paid"],
+		"due_amount": due_amount,
+		"payment_method_choices": PaymentMethod.choices,
+		"today": timezone.localdate(),
 	}
 
 
@@ -647,21 +702,156 @@ def customers(request):
 def customer_detail(request, pk):
 	customer = get_object_or_404(Customer, pk=pk)
 	transactions = customer.transactions.all().order_by("-date", "-created_at")
-	sales = customer.sales.all().order_by("-date", "-created_at")
-
-	totals = transactions.aggregate(
-		total_income=Sum("amount", filter=Q(type="income")),
-		total_expense=Sum("amount", filter=Q(type="expense")),
-	)
 
 	context = {
 		"customer": customer,
 		"transactions": transactions,
-		"sales": sales,
-		"total_income": totals["total_income"] or 0,
-		"total_expense": totals["total_expense"] or 0,
 	}
+	context.update(_customer_payment_context(customer))
 	return render(request, "core/customer_detail.html", context)
+
+
+@login_required
+def customer_allocate_payment(request, pk):
+	customer = get_object_or_404(Customer, pk=pk)
+
+	if request.method != "POST":
+		return redirect("customer_detail", pk=customer.pk)
+
+	raw_amount = request.POST.get("payment_amount", "").strip()
+	raw_date = request.POST.get("payment_date", "").strip()
+	payment_method = request.POST.get("payment_method", PaymentMethod.CASH).strip()
+	sale_ids = request.POST.getlist("sale_ids")
+	notes = request.POST.get("notes", "").strip()
+
+	try:
+		payment_amount = Decimal(raw_amount)
+	except Exception:
+		payment_amount = Decimal("0.00")
+
+	if payment_amount <= 0:
+		message = "Enter a valid payment amount greater than zero."
+		if request.headers.get("HX-Request"):
+			context = {"customer": customer, "allocation_error": message}
+			context.update(_customer_payment_context(customer))
+			return render(request, "core/partials/customer_payment_section.html", context)
+		messages.error(request, message)
+		return redirect("customer_detail", pk=customer.pk)
+
+	if not sale_ids:
+		message = "Select at least one pending sale to allocate payment."
+		if request.headers.get("HX-Request"):
+			context = {"customer": customer, "allocation_error": message}
+			context.update(_customer_payment_context(customer))
+			return render(request, "core/partials/customer_payment_section.html", context)
+		messages.error(request, message)
+		return redirect("customer_detail", pk=customer.pk)
+
+	if payment_method not in dict(PaymentMethod.choices):
+		payment_method = PaymentMethod.CASH
+
+	payment_date = timezone.localdate()
+	if raw_date:
+		try:
+			payment_date = timezone.datetime.strptime(raw_date, "%Y-%m-%d").date()
+		except ValueError:
+			payment_date = timezone.localdate()
+
+	with db_transaction.atomic():
+		selected_sales = list(
+			Sale.objects.select_for_update()
+			.filter(customer=customer, status=RecordStatus.PENDING, id__in=sale_ids)
+			.order_by("date", "created_at", "id")
+		)
+
+		if not selected_sales:
+			message = "No eligible pending sales were found for allocation."
+			if request.headers.get("HX-Request"):
+				context = {"customer": customer, "allocation_error": message}
+				context.update(_customer_payment_context(customer))
+				return render(request, "core/partials/customer_payment_section.html", context)
+			messages.error(request, message)
+			return redirect("customer_detail", pk=customer.pk)
+
+		customer_payment = CustomerPayment.objects.create(
+			customer=customer,
+			payment_date=payment_date,
+			amount=payment_amount,
+			payment_method=payment_method,
+			notes=notes,
+		)
+
+		remaining_payment = payment_amount
+		allocated_total = Decimal("0.00")
+		fully_paid_count = 0
+		partial_count = 0
+
+		for sale in selected_sales:
+			if remaining_payment <= 0:
+				break
+
+			sale_due = sale.total_amount - sale.paid_amount
+			if sale_due <= 0:
+				continue
+
+			allocation_amount = min(remaining_payment, sale_due)
+			if allocation_amount <= 0:
+				continue
+
+			receipt = Transaction.objects.create(
+				date=payment_date,
+				amount=allocation_amount,
+				type=TransactionType.INCOME,
+				category=PAYMENT_ALLOCATION_CATEGORY,
+				description=f"Allocated from customer payment to invoice {sale.invoice_number}",
+				customer=customer,
+				sale=sale,
+			)
+
+			PaymentAllocation.objects.create(
+				customer_payment=customer_payment,
+				sale=sale,
+				transaction=receipt,
+				amount=allocation_amount,
+			)
+
+			remaining_payment -= allocation_amount
+			allocated_total += allocation_amount
+
+			_sync_sale_payment_fields(sale)
+			_sync_paid_sale_income_entry(sale)
+
+			sale.refresh_from_db(fields=["status", "paid_amount"])
+			if sale.status == RecordStatus.PAID:
+				fully_paid_count += 1
+			else:
+				partial_count += 1
+
+		customer_payment.allocated_amount = allocated_total
+		customer_payment.unallocated_amount = remaining_payment
+		customer_payment.save(update_fields=["allocated_amount", "unallocated_amount", "updated_at"])
+
+		if remaining_payment > 0:
+			customer.credit_balance = customer.credit_balance + remaining_payment
+			customer.save(update_fields=["credit_balance", "updated_at"])
+
+	summary_text = (
+		f"Payment allocated: NPR {allocated_total}. "
+		f"{fully_paid_count} fully paid, {partial_count} partially paid."
+	)
+	if remaining_payment > 0:
+		summary_text += f" NPR {remaining_payment} added to customer credit."
+
+	if request.headers.get("HX-Request"):
+		context = {
+			"customer": customer,
+			"allocation_success": summary_text,
+		}
+		context.update(_customer_payment_context(customer))
+		return render(request, "core/partials/customer_payment_section.html", context)
+
+	messages.success(request, summary_text)
+	return redirect("customer_detail", pk=customer.pk)
 
 
 @login_required

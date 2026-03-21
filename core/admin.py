@@ -1,11 +1,25 @@
 from django.contrib import admin
 
-from .models import AlertNotification, Customer, Sale, Transaction
+from .models import (
+    AlertNotification,
+    Customer,
+    CustomerPayment,
+    PaymentAllocation,
+    Sale,
+    Transaction,
+)
 
 
 @admin.register(Customer)
 class CustomerAdmin(admin.ModelAdmin):
-    list_display = ("name", "phone", "type", "opening_balance", "created_at")
+    list_display = (
+        "name",
+        "phone",
+        "type",
+        "opening_balance",
+        "credit_balance",
+        "created_at",
+    )
     list_filter = ("type", "created_at")
     search_fields = ("name", "phone", "address", "credit_terms")
     ordering = ("name",)
@@ -66,3 +80,27 @@ class AlertNotificationAdmin(admin.ModelAdmin):
     list_filter = ("alert_type", "source_type", "is_active", "is_read", "due_date")
     search_fields = ("title", "message", "customer__name")
     autocomplete_fields = ("customer",)
+
+
+@admin.register(CustomerPayment)
+class CustomerPaymentAdmin(admin.ModelAdmin):
+    list_display = (
+        "payment_date",
+        "customer",
+        "amount",
+        "payment_method",
+        "allocated_amount",
+        "unallocated_amount",
+    )
+    list_filter = ("payment_method", "payment_date")
+    search_fields = ("customer__name", "notes")
+    autocomplete_fields = ("customer",)
+    date_hierarchy = "payment_date"
+    ordering = ("-payment_date", "-created_at")
+
+
+@admin.register(PaymentAllocation)
+class PaymentAllocationAdmin(admin.ModelAdmin):
+    list_display = ("customer_payment", "sale", "amount", "transaction", "created_at")
+    search_fields = ("sale__invoice_number", "customer_payment__customer__name")
+    autocomplete_fields = ("customer_payment", "sale", "transaction")
