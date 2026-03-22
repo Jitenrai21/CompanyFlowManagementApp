@@ -1,7 +1,5 @@
 # Company Flow Management App
 
-![Company Logo](CompanyLogo.png)
-
 Company Flow Management App is a Django-based operational finance system for tracking daily business cash flow, sales invoices, customer balances, JCB records, and due-date alerts.
 
 It is designed for businesses that need practical day-to-day control over:
