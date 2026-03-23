@@ -14,7 +14,7 @@ def _decorate_widget(field_name, field):
         return
     if field_name in {"description", "profile_notes", "address", "items"}:
         field.widget.attrs["class"] = f"textarea textarea-bordered w-full {existing_class}".strip()
-    elif field_name in {"type", "payment_method", "customer", "status", "sale"}:
+    elif field_name in {"type", "payment_method", "customer", "status", "sale", "category"}:
         field.widget.attrs["class"] = f"select select-bordered w-full {existing_class}".strip()
     elif field_name == "attachment":
         field.widget.attrs["class"] = f"file-input file-input-bordered w-full {existing_class}".strip()
@@ -168,6 +168,7 @@ class SaleForm(forms.ModelForm):
         for field_name, field in self.fields.items():
             _decorate_widget(field_name, field)
         self.fields["customer"].widget.attrs["data-customer-autocomplete"] = "true"
+        self.fields["customer"].widget.attrs["data-customer-placeholder"] = "Search customer by name..."
 
 
 class TransactionForm(forms.ModelForm):
@@ -198,9 +199,13 @@ class TransactionForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["customer"].required = False
+        self.fields["category"].required = False
         for field_name, field in self.fields.items():
             _decorate_widget(field_name, field)
         self.fields["customer"].widget.attrs["data-customer-autocomplete"] = "true"
+        self.fields["customer"].widget.attrs["data-customer-placeholder"] = "Search customer by name..."
+        self.fields["category"].widget.attrs["data-category-autocomplete"] = "true"
+        self.fields["category"].widget.attrs["data-category-placeholder"] = "Search or create category..."
         self.fields["sale"].required = False
 
 

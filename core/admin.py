@@ -8,7 +8,16 @@ from .models import (
     PaymentAllocation,
     Sale,
     Transaction,
+    TransactionCategory,
 )
+
+
+@admin.register(TransactionCategory)
+class TransactionCategoryAdmin(admin.ModelAdmin):
+    list_display = ("name", "is_predefined")
+    list_filter = ("is_predefined",)
+    search_fields = ("name",)
+    ordering = ("name",)
 
 
 @admin.register(Customer)
@@ -47,10 +56,10 @@ class TransactionAdmin(admin.ModelAdmin):
     list_filter = ("type", "payment_method", "date", "category", "sale", "jcb_record")
     search_fields = (
         "customer__name",
-        "category",
+        "category__name",
         "description",
     )
-    autocomplete_fields = ("customer", "sale", "jcb_record")
+    autocomplete_fields = ("customer", "sale", "jcb_record", "category")
     date_hierarchy = "date"
     ordering = ("-date",)
 

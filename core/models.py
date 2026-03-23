@@ -37,6 +37,17 @@ class PaymentMethod(models.TextChoices):
     OTHER = "other", "Other"
 
 
+class TransactionCategory(models.Model):
+    name = models.CharField(max_length=100, unique=True)
+    is_predefined = models.BooleanField(default=True, help_text="If True, this is a system-defined category")
+    
+    class Meta:
+        ordering = ["name"]
+    
+    def __str__(self) -> str:
+        return self.name
+
+
 class Customer(TimeStampedModel):
     name = models.CharField(max_length=150)
     phone = models.CharField(max_length=30, blank=True)
@@ -68,7 +79,13 @@ class Transaction(TimeStampedModel):
         choices=PaymentMethod.choices,
         default=PaymentMethod.CASH,
     )
-    category = models.CharField(max_length=80)
+    category = models.ForeignKey(
+        TransactionCategory,
+        on_delete=models.SET_NULL,
+        related_name="transactions",
+        blank=True,
+        null=True,
+    )
     description = models.TextField(blank=True)
     customer = models.ForeignKey(
         Customer,

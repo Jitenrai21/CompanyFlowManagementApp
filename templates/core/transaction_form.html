@@ -45,8 +45,9 @@
                 {% if form.payment_method.errors %}<p class="text-error text-sm mt-1">{{ form.payment_method.errors|join:', ' }}</p>{% endif %}
             </div>
             <div class="form-control md:col-span-2">
-                <label class="label" for="id_customer"><span class="label-text">Customer</span></label>
+                <label class="label" for="id_customer"><span class="label-text">Customer Assignment (Optional)</span></label>
                 {{ form.customer }}
+                <p class="text-xs text-base-content/60 mt-1">Search by customer name and choose one profile.</p>
                 {% if form.customer.errors %}<p class="text-error text-sm mt-1">{{ form.customer.errors|join:', ' }}</p>{% endif %}
             </div>
             <div class="form-control md:col-span-2">

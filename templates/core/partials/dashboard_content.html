@@ -109,6 +109,28 @@
         </div>
     </div>
 
+        <div class="grid gap-4 lg:grid-cols-1">
+        <div class="cf-section">
+            <div class="card-body">
+                <h2 class="card-title text-xl">Top Expense Categories</h2>
+                <div class="h-72 cf-chart-shell">
+                    <div id="category-expense-chart" class="h-full w-full" role="img" tabindex="0" aria-label="Top expense categories pie chart"></div>
+                    <p class="sr-only">Top expense categories pie chart showing which categories account for the most spending.</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="cf-section">
+            <div class="card-body">
+                <h2 class="card-title text-xl">Top Income Categories</h2>
+                <div class="h-72 cf-chart-shell">
+                    <div id="category-income-chart" class="h-full w-full" role="img" tabindex="0" aria-label="Top income categories pie chart"></div>
+                    <p class="sr-only">Top income categories pie chart showing which categories account for the most income.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
     <div class="grid gap-4 xl:grid-cols-3">
         <div class="cf-table-shell">
             <div class="card-body pb-0 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -235,4 +257,8 @@
     {{ jcb_summary_values|json_script:'jcb-summary-values' }}
     {{ top_customer_labels|json_script:'top-customer-labels' }}
     {{ top_customer_values|json_script:'top-customer-values' }}
+    {{ category_expense_labels|json_script:'category-expense-labels' }}
+    {{ category_expense_values|json_script:'category-expense-values' }}
+    {{ category_income_labels|json_script:'category-income-labels' }}
+    {{ category_income_values|json_script:'category-income-values' }}
 </div>

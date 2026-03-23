@@ -464,6 +464,50 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     border-color: rgba(74, 98, 138, 0.6);
 }
 
+.ts-wrapper.cf-customer-select {
+    width: 100%;
+}
+
+.ts-wrapper.cf-customer-select .ts-control {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    min-height: 2.8rem;
+    padding: 0.35rem 0.65rem;
+    border-radius: 0.75rem;
+    border: 1px solid rgba(74, 98, 138, 0.28);
+    background-color: #fff;
+}
+
+.ts-wrapper.cf-customer-select.focus .ts-control {
+    box-shadow: 0 0 0 3px rgba(122, 178, 211, 0.28);
+    border-color: rgba(74, 98, 138, 0.6);
+}
+
+.ts-wrapper.cf-customer-select.single .ts-control .item {
+    flex: 1;
+    min-width: 0;
+    line-height: 1.35;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.ts-wrapper.cf-customer-select .ts-control > input {
+    min-width: 1ch;
+    line-height: 1.35;
+}
+
+.ts-wrapper.cf-customer-select .ts-dropdown {
+    border-radius: 0.75rem;
+    border: 1px solid rgba(74, 98, 138, 0.22);
+    box-shadow: 0 10px 30px -18px rgba(24, 49, 83, 0.5);
+}
+
+.ts-wrapper.cf-customer-select .ts-dropdown .option {
+    padding: 0.5rem 0.7rem;
+}
+
 .cf-auth-shell {
     position: relative;
     overflow: hidden;

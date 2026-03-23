@@ -25,6 +25,7 @@ from .models import (
 	RecordStatus,
 	Sale,
 	Transaction,
+	TransactionCategory,
 	TransactionType,
 )
 
@@ -274,6 +275,26 @@ def _dashboard_context(date_from="", date_to=""):
 		float(jcb_summary["total_jcb_expense"]),
 	]
 
+	# Category breakdown for expenses (for pie chart)
+	expense_by_category = (
+		transactions_queryset.filter(type=TransactionType.EXPENSE)
+		.values("category__name")
+		.annotate(total=Coalesce(Sum("amount"), Value(Decimal("0.00"))))
+		.order_by("-total")
+	)
+	category_expense_labels = [row["category__name"] or "Uncategorized" for row in expense_by_category]
+	category_expense_values = [float(row["total"]) for row in expense_by_category]
+
+	# Category breakdown for income (for pie chart)
+	income_by_category = (
+		transactions_queryset.filter(type=TransactionType.INCOME)
+		.values("category__name")
+		.annotate(total=Coalesce(Sum("amount"), Value(Decimal("0.00"))))
+		.order_by("-total")
+	)
+	category_income_labels = [row["category__name"] or "Uncategorized" for row in income_by_category]
+	category_income_values = [float(row["total"]) for row in income_by_category]
+
 	return {
 		"kpis": {
 			"total_sales": kpi_sales["total_sales"],
@@ -296,6 +317,10 @@ def _dashboard_context(date_from="", date_to=""):
 		"jcb_summary_values": jcb_summary_values,
 		"top_customer_labels": top_customer_labels,
 		"top_customer_values": top_customer_values,
+		"category_expense_labels": category_expense_labels,
+		"category_expense_values": category_expense_values,
+		"category_income_labels": category_income_labels,
+		"category_income_values": category_income_values,
 		"filters": {
 			"date_from": date_from,
 			"date_to": date_to,
@@ -551,18 +576,19 @@ def dashboard(request):
 
 @login_required
 def cash_entries(request):
-	transactions = Transaction.objects.select_related("customer").all()
+	transactions = Transaction.objects.select_related("customer", "sale", "jcb_record", "category").all()
 
 	query = request.GET.get("q", "").strip()
 	date_from = request.GET.get("date_from", "").strip()
 	date_to = request.GET.get("date_to", "").strip()
 	transaction_type = request.GET.get("type", "").strip()
 	customer_id = request.GET.get("customer", "").strip()
+	category_id = request.GET.get("category", "").strip()
 	sort = request.GET.get("sort", "-date")
 
 	if query:
 		transactions = transactions.filter(
-			Q(category__icontains=query)
+			Q(category__name__icontains=query)
 			| Q(description__icontains=query)
 			| Q(customer__name__icontains=query)
 		)
@@ -574,6 +600,8 @@ def cash_entries(request):
 		transactions = transactions.filter(type=transaction_type)
 	if customer_id:
 		transactions = transactions.filter(customer_id=customer_id)
+	if category_id:
+		transactions = transactions.filter(category_id=category_id)
 
 	allowed_sorts = {
 		"-date": "-date",
@@ -588,12 +616,14 @@ def cash_entries(request):
 	context = {
 		"transactions": transactions,
 		"customers": Customer.objects.all(),
+		"categories": TransactionCategory.objects.all().order_by("name"),
 		"filters": {
 			"q": query,
 			"date_from": date_from,
 			"date_to": date_to,
 			"type": transaction_type,
 			"customer": customer_id,
+			"category": category_id,
 			"sort": sort,
 		},
 	}
@@ -601,6 +631,19 @@ def cash_entries(request):
 	if request.headers.get("HX-Request"):
 		return render(request, "core/partials/transaction_table.html", context)
 	return render(request, "core/cash_entries.html", context)
+
+
+@login_required
+def transaction_detail(request, pk):
+	transaction_obj = get_object_or_404(
+		Transaction.objects.select_related("customer", "sale", "jcb_record"),
+		pk=pk,
+	)
+
+	context = {
+		"transaction": transaction_obj,
+	}
+	return render(request, "core/transaction_detail.html", context)
 
 
 @login_required

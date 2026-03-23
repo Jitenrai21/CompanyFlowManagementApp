@@ -6,6 +6,7 @@ urlpatterns = [
     path("", views.dashboard, name="dashboard"),
     path("cash-entries/", views.cash_entries, name="cash_entries"),
     path("cash-entries/new/", views.transaction_create, name="transaction_create"),
+    path("cash-entries/<int:pk>/", views.transaction_detail, name="transaction_detail"),
     path("cash-entries/<int:pk>/edit/", views.transaction_edit, name="transaction_edit"),
     path("cash-entries/<int:pk>/delete/", views.transaction_delete, name="transaction_delete"),
     path("sales/", views.sales, name="sales"),

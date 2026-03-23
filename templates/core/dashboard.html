@@ -151,6 +151,26 @@
         return formatIndianNumber(value, { maximumFractionDigits: 0 });
     }
 
+    function formatCompactAxisValue(value) {
+        const numeric = numberFrom(value);
+        const absolute = Math.abs(numeric);
+
+        function trimTrailingZero(text) {
+            return text.replace(/\.0$/, '');
+        }
+
+        if (absolute >= 10000000) {
+            return `${trimTrailingZero((numeric / 10000000).toFixed(1))}Cr`;
+        }
+        if (absolute >= 100000) {
+            return `${trimTrailingZero((numeric / 100000).toFixed(1))}L`;
+        }
+        if (absolute >= 1000) {
+            return `${trimTrailingZero((numeric / 1000).toFixed(1))}K`;
+        }
+        return formatIndianNumber(numeric, { maximumFractionDigits: 0 });
+    }
+
     function applyIndianCurrencyFormatting(root = document) {
         root.querySelectorAll('.js-npr-value').forEach((element) => {
             const rawValue = element.dataset.nprValue;
@@ -186,7 +206,9 @@
         chartResizeObservers = [];
         Object.keys(dashboardCharts).forEach((key) => {
             if (dashboardCharts[key]) {
-                dashboardCharts[key].destroy();
+                if (typeof dashboardCharts[key].dispose === 'function') {
+                    dashboardCharts[key].dispose();
+                }
                 dashboardCharts[key] = null;
             }
         });
@@ -260,11 +282,17 @@
         const jcbSummaryValues = cleanSeries(readJsonScript('jcb-summary-values'));
         const topCustomerLabels = readJsonScript('top-customer-labels');
         const topCustomerValues = cleanSeries(readJsonScript('top-customer-values'));
+        const categoryExpenseLabels = readJsonScript('category-expense-labels');
+        const categoryExpenseValues = cleanSeries(readJsonScript('category-expense-values'));
+        const categoryIncomeLabels = readJsonScript('category-income-labels');
+        const categoryIncomeValues = cleanSeries(readJsonScript('category-income-values'));
 
         const trendCanvas = document.getElementById('sales-trend-chart');
         const pieCanvas = document.getElementById('income-expense-chart');
         const jcbSummaryCanvas = document.getElementById('jcb-summary-chart');
         const topCanvas = document.getElementById('top-customers-chart');
+        const categoryExpenseCanvas = document.getElementById('category-expense-chart');
+        const categoryIncomeCanvas = document.getElementById('category-income-chart');
 
         destroyDashboardCharts();
 
@@ -411,10 +439,16 @@
             const topCustomersChart = echarts.init(topCanvas, null, { renderer: 'canvas' });
             topCustomersChart.setOption({
                 animationDuration: 960,
-                grid: { left: 120, right: 24, top: 24, bottom: 22 },
+                grid: { left: 120, right: 46, top: 24, bottom: 22 },
                 xAxis: {
                     type: 'value',
-                    axisLabel: { color: '#516178', formatter: (value) => formatNprAxis(value) },
+                    splitNumber: 4,
+                    axisLabel: {
+                        color: '#516178',
+                        hideOverlap: true,
+                        margin: 10,
+                        formatter: (value) => formatCompactAxisValue(value)
+                    },
                     splitLine: { lineStyle: { color: 'rgba(80, 110, 150, 0.12)' } }
                 },
                 yAxis: {
@@ -460,7 +494,7 @@
                         show: true,
                         position: 'right',
                         color: '#31445F',
-                        formatter: ({ value }) => formatNprAxis(value)
+                        formatter: ({ value }) => formatCompactAxisValue(value)
                     },
                     emphasis: { focus: 'series' }
                 }]
@@ -560,6 +594,102 @@
                 ]
             });
             registerChart('jcbSummary', jcbChart, jcbSummaryCanvas);
+        }
+
+        // Category Expense Pie Chart
+        if (categoryExpenseCanvas && categoryExpenseLabels && categoryExpenseValues) {
+            const expenseChartData = categoryExpenseLabels.map((label, index) => ({
+                name: label || 'Uncategorized',
+                value: categoryExpenseValues[index]
+            }));
+            const expenseChart = echarts.init(categoryExpenseCanvas, null, { renderer: 'canvas' });
+            expenseChart.setOption({
+                animationDuration: 900,
+                color: [chartPalette.coral, chartPalette.amber, chartPalette.blue, chartPalette.mint, chartPalette.violet, chartPalette.slate, chartPalette.cyan, chartPalette.ink],
+                tooltip: {
+                    trigger: 'item',
+                    backgroundColor: 'rgba(15, 23, 42, 0.94)',
+                    borderWidth: 0,
+                    textStyle: { color: '#F8FAFC' },
+                    formatter(params) {
+                        const value = numberFrom(params.value);
+                        const total = expenseChartData.reduce((sum, item) => sum + numberFrom(item.value), 0);
+                        const pct = total > 0 ? ((value / total) * 100).toFixed(1) : '0.0';
+                        return `${params.name}<br/>Expense: ${formatNpr(value)}<br/>Percentage: ${pct}%`;
+                    }
+                },
+                legend: {
+                    top: 'bottom',
+                    textStyle: { color: '#31445F' },
+                    orient: 'vertical',
+                    right: 10
+                },
+                series: [{
+                    type: 'pie',
+                    radius: ['25%', '70%'],
+                    avoidLabelOverlap: true,
+                    itemStyle: { borderRadius: 4, borderColor: '#fff', borderWidth: 2 },
+                    label: {
+                        position: 'outside',
+                        color: '#31445F',
+                        formatter: '{b}',
+                        distanceToLabelLine: 8
+                    },
+                    emphasis: {
+                        label: { show: true, fontSize: 11, fontWeight: 'bold' }
+                    },
+                    data: expenseChartData
+                }]
+            });
+            registerChart('categoryExpense', expenseChart, categoryExpenseCanvas);
+        }
+
+        // Category Income Pie Chart
+        if (categoryIncomeCanvas && categoryIncomeLabels && categoryIncomeValues) {
+            const incomeChartData = categoryIncomeLabels.map((label, index) => ({
+                name: label || 'Uncategorized',
+                value: categoryIncomeValues[index]
+            }));
+            const incomeChart = echarts.init(categoryIncomeCanvas, null, { renderer: 'canvas' });
+            incomeChart.setOption({
+                animationDuration: 900,
+                color: [chartPalette.mint, chartPalette.blue, chartPalette.cyan, chartPalette.violet, chartPalette.coral, chartPalette.amber, chartPalette.slate, chartPalette.ink],
+                tooltip: {
+                    trigger: 'item',
+                    backgroundColor: 'rgba(15, 23, 42, 0.94)',
+                    borderWidth: 0,
+                    textStyle: { color: '#F8FAFC' },
+                    formatter(params) {
+                        const value = numberFrom(params.value);
+                        const total = incomeChartData.reduce((sum, item) => sum + numberFrom(item.value), 0);
+                        const pct = total > 0 ? ((value / total) * 100).toFixed(1) : '0.0';
+                        return `${params.name}<br/>Income: ${formatNpr(value)}<br/>Percentage: ${pct}%`;
+                    }
+                },
+                legend: {
+                    top: 'bottom',
+                    textStyle: { color: '#31445F' },
+                    orient: 'vertical',
+                    right: 10
+                },
+                series: [{
+                    type: 'pie',
+                    radius: ['25%', '70%'],
+                    avoidLabelOverlap: true,
+                    itemStyle: { borderRadius: 4, borderColor: '#fff', borderWidth: 2 },
+                    label: {
+                        position: 'outside',
+                        color: '#31445F',
+                        formatter: '{b}',
+                        distanceToLabelLine: 8
+                    },
+                    emphasis: {
+                        label: { show: true, fontSize: 11, fontWeight: 'bold' }
+                    },
+                    data: incomeChartData
+                }]
+            });
+            registerChart('categoryIncome', incomeChart, categoryIncomeCanvas);
         }
 
         applyIndianCurrencyFormatting(document.getElementById('dashboard-content') || document);

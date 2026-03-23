@@ -14,7 +14,7 @@
                     <th>Category</th>
                     <th>Amount</th>
                     <th>Attachment</th>
-                    <th class="text-right">Actions</th>
+                    <th class="text-right whitespace-nowrap">Actions</th>
                 </tr>
             </thead>
             <tbody>
@@ -23,7 +23,12 @@
                     <td>{{ transaction.date }}</td>
                     <td>{% if transaction.customer %}{{ transaction.customer.name }}{% else %}<span class="text-base-content/50">Unassigned</span>{% endif %}</td>
                     <td>
-                        <span class="badge {% if transaction.type == 'income' %}badge-success{% else %}badge-error{% endif %} badge-outline">
+                        <span class="badge badge-sm whitespace-nowrap gap-1 {% if transaction.type == 'income' %}badge-success badge-soft{% else %}badge-error badge-soft{% endif %}">
+                            {% if transaction.type == 'income' %}
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-3.5 w-3.5" aria-hidden="true"><path fill-rule="evenodd" d="M10 2a1 1 0 011 1v9.586l2.293-2.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 111.414-1.414L9 12.586V3a1 1 0 011-1z" clip-rule="evenodd" /></svg>
+                            {% else %}
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-3.5 w-3.5" aria-hidden="true"><path fill-rule="evenodd" d="M10 18a1 1 0 01-1-1V7.414L6.707 9.707a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 01-1.414 1.414L11 7.414V17a1 1 0 01-1 1z" clip-rule="evenodd" /></svg>
+                            {% endif %}
                             {{ transaction.get_type_display }}
                         </span>
                     </td>
@@ -37,19 +42,47 @@
                         <span class="text-base-content/50">None</span>
                         {% endif %}
                     </td>
-                    <td class="text-right">
-                        <div class="inline-flex gap-1">
-                            <a href="{% url 'transaction_edit' transaction.id %}" class="btn btn-xs btn-outline">Edit</a>
-                            <form method="post"
-                                  action="{% url 'transaction_delete' transaction.id %}"
-                                  hx-post="{% url 'transaction_delete' transaction.id %}"
-                                  hx-target="closest tr"
-                                  hx-swap="delete"
-                                  onsubmit="return confirm('Delete this cash entry? This cannot be undone.');"
-                                  class="inline">
-                                {% csrf_token %}
-                                <button type="submit" class="btn btn-xs btn-error btn-outline" aria-label="Delete transaction {{ transaction.id }}">Delete</button>
-                            </form>
+                    <td class="text-right align-middle">
+                        <div class="inline-flex min-h-8 items-center justify-end gap-1 whitespace-nowrap">
+                            <div class="hidden md:flex items-center justify-end gap-1">
+                                <a href="{% url 'transaction_detail' transaction.id %}" class="btn btn-xs btn-square btn-outline" title="View entry" aria-label="View transaction {{ transaction.id }}">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-3.5 w-3.5" aria-hidden="true"><path d="M10 3c-4.5 0-8.25 2.5-9.5 6.5C1.75 13.5 5.5 16 10 16s8.25-2.5 9.5-6.5C18.25 5.5 14.5 3 10 3zm0 10a3.5 3.5 0 110-7 3.5 3.5 0 010 7z" /></svg>
+                                </a>
+                                <a href="{% url 'transaction_edit' transaction.id %}" class="btn btn-xs btn-square btn-outline" title="Edit entry" aria-label="Edit transaction {{ transaction.id }}">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-3.5 w-3.5" aria-hidden="true"><path d="M13.586 2.586a2 2 0 112.828 2.828l-8.9 8.9a1 1 0 01-.424.26l-3 1a1 1 0 01-1.264-1.264l1-3a1 1 0 01.26-.424l8.9-8.9z" /></svg>
+                                </a>
+                                <form method="post"
+                                      action="{% url 'transaction_delete' transaction.id %}"
+                                      hx-post="{% url 'transaction_delete' transaction.id %}"
+                                      hx-target="closest tr"
+                                      hx-swap="delete"
+                                      onsubmit="return confirm('Delete this cash entry? This cannot be undone.');"
+                                      class="inline">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-xs btn-square btn-error btn-outline" title="Delete entry" aria-label="Delete transaction {{ transaction.id }}">
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-3.5 w-3.5" aria-hidden="true"><path fill-rule="evenodd" d="M7 2a1 1 0 00-.894.553L5.382 4H3a1 1 0 000 2h.293l.94 9.405A2 2 0 006.222 17h7.556a2 2 0 001.989-1.595L16.707 6H17a1 1 0 100-2h-2.382l-.724-1.447A1 1 0 0013 2H7zm2 5a1 1 0 10-2 0v6a1 1 0 102 0V7zm4 0a1 1 0 10-2 0v6a1 1 0 102 0V7z" clip-rule="evenodd" /></svg>
+                                    </button>
+                                </form>
+                            </div>
+
+                            <div class="dropdown dropdown-end md:hidden">
+                                <label tabindex="0" class="btn btn-xs btn-outline">Actions</label>
+                                <div tabindex="0" class="dropdown-content z-[1] mt-2 w-44 rounded-box border border-base-300 bg-base-100 p-2 shadow">
+                                    <div class="flex flex-col gap-1">
+                                        <a href="{% url 'transaction_detail' transaction.id %}" class="btn btn-xs btn-ghost justify-start">View</a>
+                                        <a href="{% url 'transaction_edit' transaction.id %}" class="btn btn-xs btn-ghost justify-start">Edit</a>
+                                        <form method="post"
+                                              action="{% url 'transaction_delete' transaction.id %}"
+                                              hx-post="{% url 'transaction_delete' transaction.id %}"
+                                              hx-target="closest tr"
+                                              hx-swap="delete"
+                                              onsubmit="return confirm('Delete this cash entry? This cannot be undone.');">
+                                            {% csrf_token %}
+                                            <button type="submit" class="btn btn-xs btn-error btn-outline w-full justify-start">Delete</button>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </td>
                 </tr>

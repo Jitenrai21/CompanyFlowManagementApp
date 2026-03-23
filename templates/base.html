@@ -196,20 +196,64 @@
                 if (element.tomselect) {
                     return;
                 }
-                new TomSelect(element, {
+                const customerSelect = new TomSelect(element, {
                     create: false,
                     sortField: {
                         field: 'text',
                         direction: 'asc'
                     },
                     maxOptions: 400,
-                    placeholder: 'Search and select customer...'
+                    maxItems: 1,
+                    searchField: ['text'],
+                    hidePlaceholder: true,
+                    closeAfterSelect: true,
+                    allowEmptyOption: true,
+                    placeholder: element.dataset.customerPlaceholder || 'Search and select customer...',
+                    render: {
+                        no_results: () => '<div class="px-3 py-2 text-sm text-base-content/60">No matching customer found</div>'
+                    }
                 });
+
+                customerSelect.wrapper.classList.remove('select', 'select-bordered');
+                customerSelect.wrapper.classList.add('cf-customer-select', 'w-full');
+            });
+        }
+
+        function initCategoryAutocomplete() {
+            if (!window.TomSelect) {
+                return;
+            }
+            document.querySelectorAll('select[data-category-autocomplete="true"]').forEach((element) => {
+                if (element.tomselect) {
+                    return;
+                }
+                const categorySelect = new TomSelect(element, {
+                    create: true,
+                    createOnBlur: true,
+                    sortField: {
+                        field: 'text',
+                        direction: 'asc'
+                    },
+                    maxOptions: 500,
+                    maxItems: 1,
+                    searchField: ['text'],
+                    hidePlaceholder: true,
+                    closeAfterSelect: true,
+                    allowEmptyOption: true,
+                    placeholder: element.dataset.categoryPlaceholder || 'Search or create category...',
+                    render: {
+                        no_results: () => '<div class="px-3 py-2 text-sm text-base-content/60">No matching category found</div>'
+                    }
+                });
+
+                categorySelect.wrapper.classList.remove('select', 'select-bordered');
+                categorySelect.wrapper.classList.add('cf-category-select', 'w-full');
             });
         }
 
         document.addEventListener('DOMContentLoaded', applyRevealAnimations);
         document.addEventListener('DOMContentLoaded', initCustomerAutocomplete);
+        document.addEventListener('DOMContentLoaded', initCategoryAutocomplete);
         function showToast(message, level = 'info') {
             const stack = document.getElementById('cf-toast-stack');
             if (!stack || !message) {
@@ -252,6 +296,7 @@
 
         document.body.addEventListener('htmx:afterSwap', () => {
             initCustomerAutocomplete();
+            initCategoryAutocomplete();
             applyRevealAnimations();
         });
     </script>
