@@ -15,7 +15,8 @@
                     <th>Received</th>
                     <th>Balance</th>
                     <th>Status</th>
-                    <th class="text-right">Actions</th>
+                    <th class="text-center whitespace-nowrap">Alert</th>
+                    <th class="text-right whitespace-nowrap">Actions</th>
                 </tr>
             </thead>
             <tbody>
@@ -48,24 +49,92 @@
                             {{ sale.get_status_display }}
                         </span>
                     </td>
-                    <td class="text-right space-x-1">
-                        <a href="{% url 'sale_detail' sale.id %}" class="btn btn-xs btn-outline">View</a>
-                        <a href="{% url 'sale_edit' sale.id %}" class="btn btn-xs btn-ghost">Edit</a>
-                        <form method="post"
-                              action="{% url 'sale_delete' sale.id %}"
-                              hx-post="{% url 'sale_delete' sale.id %}"
-                              hx-target="closest tr"
-                              hx-swap="delete"
-                              onsubmit="return confirm('Delete sale {{ sale.invoice_number }}? This cannot be undone.');"
-                              class="inline">
-                            {% csrf_token %}
-                            <button type="submit" class="btn btn-xs btn-error btn-outline" aria-label="Delete sale {{ sale.invoice_number }}">Delete</button>
-                        </form>
+                    <td class="align-middle text-center">
+                        {% if sale.status == 'pending' %}
+                        <span class="badge badge-sm badge-outline whitespace-nowrap inline-flex min-w-[5.75rem] justify-center {% if sale.alert_enabled %}badge-error{% else %}badge-ghost{% endif %}">
+                            Alert {% if sale.alert_enabled %}On{% else %}Off{% endif %}
+                        </span>
+                        {% else %}
+                        <span class="text-base-content/40">N/A</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-right align-middle">
+                        <div class="inline-flex min-h-8 items-center justify-end gap-1 whitespace-nowrap">
+                            <div class="hidden md:flex items-center justify-end gap-1">
+                                <a href="{% url 'sale_detail' sale.id %}" class="btn btn-xs btn-square btn-outline" title="View sale" aria-label="View sale {{ sale.invoice_number }}">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-3.5 w-3.5" aria-hidden="true"><path d="M10 3c-4.5 0-8.25 2.5-9.5 6.5C1.75 13.5 5.5 16 10 16s8.25-2.5 9.5-6.5C18.25 5.5 14.5 3 10 3zm0 10a3.5 3.5 0 110-7 3.5 3.5 0 010 7z" /></svg>
+                                </a>
+                                <a href="{% url 'sale_edit' sale.id %}" class="btn btn-xs btn-square btn-ghost" title="Edit sale" aria-label="Edit sale {{ sale.invoice_number }}">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-3.5 w-3.5" aria-hidden="true"><path d="M13.586 2.586a2 2 0 112.828 2.828l-8.9 8.9a1 1 0 01-.424.26l-3 1a1 1 0 01-1.264-1.264l1-3a1 1 0 01.26-.424l8.9-8.9z" /></svg>
+                                </a>
+                                {% if sale.status == 'pending' %}
+                                <form method="post" action="{% url 'sale_mark_paid' sale.id %}" class="inline" onsubmit="return confirm('Mark sale {{ sale.invoice_number }} as paid?');">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                    <button type="submit" class="btn btn-xs btn-square btn-success btn-outline" title="Mark paid" aria-label="Mark sale {{ sale.invoice_number }} as paid">
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-3.5 w-3.5" aria-hidden="true"><path fill-rule="evenodd" d="M16.704 5.29a1 1 0 010 1.42l-7.5 7.5a1 1 0 01-1.415.005l-3.5-3.4a1 1 0 011.394-1.434l2.793 2.714 6.803-6.805a1 1 0 011.425 0z" clip-rule="evenodd" /></svg>
+                                    </button>
+                                </form>
+                                <form method="post" action="{% url 'sale_toggle_alert' sale.id %}" class="inline">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                    <button type="submit" class="btn btn-xs btn-square {% if sale.alert_enabled %}btn-warning{% else %}btn-info{% endif %} btn-outline" title="Toggle alert" aria-label="Toggle alert for sale {{ sale.invoice_number }}">
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-3.5 w-3.5" aria-hidden="true"><path d="M10 2a4 4 0 00-4 4v2.35c0 .69-.28 1.35-.78 1.84L4 11.41V13h12v-1.59l-1.22-1.22a2.6 2.6 0 01-.78-1.84V6a4 4 0 00-4-4z" /><path d="M8.5 15a1.5 1.5 0 003 0h-3z" /></svg>
+                                    </button>
+                                </form>
+                                {% endif %}
+                                <form method="post"
+                                      action="{% url 'sale_delete' sale.id %}"
+                                      hx-post="{% url 'sale_delete' sale.id %}"
+                                      hx-target="closest tr"
+                                      hx-swap="delete"
+                                      onsubmit="return confirm('Delete sale {{ sale.invoice_number }}? This cannot be undone.');"
+                                      class="inline">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-xs btn-square btn-error btn-outline" title="Delete sale" aria-label="Delete sale {{ sale.invoice_number }}">
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-3.5 w-3.5" aria-hidden="true"><path fill-rule="evenodd" d="M7 2a1 1 0 00-.894.553L5.382 4H3a1 1 0 000 2h.293l.94 9.405A2 2 0 006.222 17h7.556a2 2 0 001.989-1.595L16.707 6H17a1 1 0 100-2h-2.382l-.724-1.447A1 1 0 0013 2H7zm2 5a1 1 0 10-2 0v6a1 1 0 102 0V7zm4 0a1 1 0 10-2 0v6a1 1 0 102 0V7z" clip-rule="evenodd" /></svg>
+                                    </button>
+                                </form>
+                            </div>
+
+                            <div class="dropdown dropdown-end md:hidden">
+                                <label tabindex="0" class="btn btn-xs btn-outline">Actions</label>
+                                <div tabindex="0" class="dropdown-content z-[1] mt-2 w-44 rounded-box border border-base-300 bg-base-100 p-2 shadow">
+                                    <div class="flex flex-col gap-1">
+                                        <a href="{% url 'sale_detail' sale.id %}" class="btn btn-xs btn-ghost justify-start">View</a>
+                                        <a href="{% url 'sale_edit' sale.id %}" class="btn btn-xs btn-ghost justify-start">Edit</a>
+                                        {% if sale.status == 'pending' %}
+                                        <form method="post" action="{% url 'sale_mark_paid' sale.id %}" onsubmit="return confirm('Mark sale {{ sale.invoice_number }} as paid?');">
+                                            {% csrf_token %}
+                                            <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                            <button type="submit" class="btn btn-xs btn-success btn-outline w-full justify-start">Mark Paid</button>
+                                        </form>
+                                        <form method="post" action="{% url 'sale_toggle_alert' sale.id %}">
+                                            {% csrf_token %}
+                                            <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                            <button type="submit" class="btn btn-xs {% if sale.alert_enabled %}btn-warning{% else %}btn-info{% endif %} btn-outline w-full justify-start">
+                                                Alert {% if sale.alert_enabled %}Off{% else %}On{% endif %}
+                                            </button>
+                                        </form>
+                                        {% endif %}
+                                        <form method="post"
+                                              action="{% url 'sale_delete' sale.id %}"
+                                              hx-post="{% url 'sale_delete' sale.id %}"
+                                              hx-target="closest tr"
+                                              hx-swap="delete"
+                                              onsubmit="return confirm('Delete sale {{ sale.invoice_number }}? This cannot be undone.');">
+                                            {% csrf_token %}
+                                            <button type="submit" class="btn btn-xs btn-error btn-outline w-full justify-start">Delete</button>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </td>
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="9" class="py-0">
+                    <td colspan="10" class="py-0">
                         <div class="cf-empty">
                             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M4 3a1 1 0 000 2h12a1 1 0 100-2H4zm-1 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm1 3a1 1 0 100 2h5a1 1 0 100-2H4zm8 0a1 1 0 000 2h4a1 1 0 100-2h-4z" /></svg>
                             <p>No sales found for selected filters.</p>

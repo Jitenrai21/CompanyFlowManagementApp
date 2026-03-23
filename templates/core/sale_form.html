@@ -95,6 +95,13 @@
                 {{ form.due_date }}
                 {% if form.due_date.errors %}<p class="text-error text-sm mt-1">{{ form.due_date.errors|join:', ' }}</p>{% endif %}
             </div>
+            <div class="form-control md:col-span-2">
+                <label class="label cursor-pointer justify-start gap-3" for="id_alert_enabled">
+                    {{ form.alert_enabled }}
+                    <span class="label-text">Enable overdue alerts for this sale when pending</span>
+                </label>
+                {% if form.alert_enabled.errors %}<p class="text-error text-sm mt-1">{{ form.alert_enabled.errors|join:', ' }}</p>{% endif %}
+            </div>
             
             <div class="form-control md:col-span-2">
                 <label class="label" for="id_notes"><span class="label-text">Description / Notes</span></label>

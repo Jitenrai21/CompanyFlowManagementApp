@@ -11,6 +11,20 @@
                 <p class="cf-page-subtitle">Customer-linked sale record with inline cash receipts.</p>
             </div>
             <div class="flex gap-2">
+                {% if sale.status == 'pending' %}
+                <form method="post" action="{% url 'sale_toggle_alert' sale.id %}" class="inline">
+                    {% csrf_token %}
+                    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                    <button type="submit" class="btn {% if sale.alert_enabled %}btn-warning{% else %}btn-info{% endif %} btn-outline">
+                        Alert {% if sale.alert_enabled %}Off{% else %}On{% endif %}
+                    </button>
+                </form>
+                <form method="post" action="{% url 'sale_mark_paid' sale.id %}" class="inline" onsubmit="return confirm('Mark invoice {{ sale.invoice_number }} as paid?');">
+                    {% csrf_token %}
+                    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                    <button type="submit" class="btn btn-success btn-outline">Mark as Paid</button>
+                </form>
+                {% endif %}
                 <a href="{% url 'sale_edit' sale.id %}" class="btn btn-outline">Edit Sale</a>
                 <form method="post"
                       action="{% url 'sale_delete' sale.id %}"
@@ -34,6 +48,7 @@
                 <div class="grid gap-3 md:grid-cols-2 text-sm">
                     <p><span class="font-semibold">Customer:</span> {% if sale.customer %}{{ sale.customer.name }}{% else %}Unassigned{% endif %}</p>
                     <p><span class="font-semibold">Status:</span> {{ sale.get_status_display }}</p>
+                    <p><span class="font-semibold">Alert Tracking:</span> {% if sale.alert_enabled %}On{% else %}Off{% endif %}</p>
                     <p><span class="font-semibold">Date:</span> {{ sale.date }}</p>
                     <p><span class="font-semibold">Due Date:</span> {{ sale.due_date }}</p>
                     <p><span class="font-semibold">Total Amount:</span> NPR {{ sale.total_amount }}</p>

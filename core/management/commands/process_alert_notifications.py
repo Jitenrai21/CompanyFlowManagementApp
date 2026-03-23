@@ -29,6 +29,11 @@ class Command(BaseCommand):
                 Sum("receipts__amount", filter=Q(receipts__type=TransactionType.INCOME)),
                 Value(Decimal("0.00")),
             )
+        ).filter(
+            status="pending",
+            alert_enabled=True,
+            due_date__isnull=False,
+            customer__isnull=False,
         )
 
         for sale in sales_queryset:

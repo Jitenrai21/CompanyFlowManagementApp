@@ -9,6 +9,7 @@ from django.db.models import Case, CharField, DecimalField, ExpressionWrapper, F
 from django.db.models.functions import Coalesce
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.utils import timezone
 
 from .forms import CustomerForm, JCBRecordForm, SaleForm, SaleReceiptForm, TransactionForm
@@ -64,11 +65,20 @@ def _dashboard_base_sales_queryset(date_from="", date_to=""):
 
 
 def _sales_alert_queryset():
-	return Sale.objects.select_related("customer").annotate(
+	return (
+		Sale.objects.select_related("customer")
+		.filter(
+			status=RecordStatus.PENDING,
+			alert_enabled=True,
+			due_date__isnull=False,
+			customer__isnull=False,
+		)
+		.annotate(
 		received_total=Coalesce(
 			Sum("receipts__amount", filter=Q(receipts__type=TransactionType.INCOME)),
 			Value(Decimal("0.00")),
 		)
+	)
 	)
 
 
@@ -88,11 +98,6 @@ def _build_alert_items(alert_type="", customer_id="", date_from="", date_to=""):
 	alert_items = []
 
 	for sale in sales_queryset:
-		if not sale.customer_id:
-			continue
-		if not sale.due_date:
-			continue
-
 		if sale.received_total >= sale.total_amount:
 			continue
 
@@ -224,7 +229,13 @@ def _dashboard_context(date_from="", date_to=""):
 	overdue_sales = [
 		sale
 		for sale in sales_rows
-		if sale.due_date and sale.due_date < today and sale.total_amount > sale.received_total
+		if (
+			sale.status == RecordStatus.PENDING
+			and sale.alert_enabled
+			and sale.due_date
+			and sale.due_date < today
+			and sale.total_amount > sale.received_total
+		)
 	]
 	overdue_count = len(overdue_sales)
 	overdue_amount = sum(
@@ -301,7 +312,20 @@ def _sync_sale_payment_fields(sale, total_received=None):
 
 	sale.paid_amount = total_received
 	sale.status = RecordStatus.PAID if total_received >= sale.total_amount else RecordStatus.PENDING
-	sale.save(update_fields=["paid_amount", "status", "updated_at"])
+	if sale.status == RecordStatus.PAID:
+		sale.alert_enabled = False
+	sale.save(update_fields=["paid_amount", "status", "alert_enabled", "updated_at"])
+
+
+def _redirect_to_next_or_default(request, default_name, **kwargs):
+	next_url = request.POST.get("next", "").strip()
+	if next_url and url_has_allowed_host_and_scheme(
+		next_url,
+		allowed_hosts={request.get_host()},
+		require_https=request.is_secure(),
+	):
+		return redirect(next_url)
+	return redirect(default_name, **kwargs)
 
 
 def _sync_paid_sale_income_entry(sale):
@@ -808,6 +832,25 @@ def jcb_record_delete(request, pk):
 
 
 @login_required
+def jcb_record_mark_paid(request, pk):
+	jcb_record = get_object_or_404(JCBRecord, pk=pk)
+
+	if request.method != "POST":
+		return _redirect_to_next_or_default(request, "jcb_records")
+
+	if jcb_record.status == RecordStatus.PAID:
+		messages.info(request, "JCB record is already marked as paid.")
+		return _redirect_to_next_or_default(request, "jcb_records")
+
+	jcb_record.status = RecordStatus.PAID
+	jcb_record.save(update_fields=["status", "updated_at"])
+	_sync_jcb_transactions(jcb_record)
+
+	messages.success(request, f"JCB record on {jcb_record.date} marked as paid.")
+	return _redirect_to_next_or_default(request, "jcb_records")
+
+
+@login_required
 def sales(request):
 	queryset = Sale.objects.select_related("customer").annotate(
 		received_total=Coalesce(
@@ -880,6 +923,8 @@ def sale_create(request):
 		if form.is_valid():
 			sale = form.save(commit=False)
 			sale.paid_amount = sale.total_amount if sale.status == RecordStatus.PAID else Decimal("0.00")
+			if sale.status == RecordStatus.PAID:
+				sale.alert_enabled = False
 			sale.save()
 			_sync_paid_sale_income_entry(sale)
 			messages.success(request, "Sale created successfully.")
@@ -908,6 +953,8 @@ def sale_edit(request, pk):
 		form = SaleForm(request.POST, instance=sale)
 		if form.is_valid():
 			sale = form.save(commit=False)
+			if sale.status == RecordStatus.PAID:
+				sale.alert_enabled = False
 			sale.save()
 			_sync_paid_sale_income_entry(sale)
 			if sale.status == RecordStatus.PAID:
@@ -917,7 +964,7 @@ def sale_edit(request, pk):
 					total=Coalesce(Sum("amount"), Value(Decimal("0.00")))
 				)
 				sale.paid_amount = summary["total"]
-			sale.save(update_fields=["paid_amount", "updated_at"])
+			sale.save(update_fields=["paid_amount", "alert_enabled", "updated_at"])
 			messages.success(request, "Sale updated successfully.")
 			return redirect("sale_detail", pk=sale.pk)
 		messages.error(request, "Please fix the errors below.")
@@ -976,6 +1023,47 @@ def sale_delete(request, pk):
 
 	messages.success(request, f"Deleted sale {invoice_number}.")
 	return redirect("sales")
+
+
+@login_required
+def sale_toggle_alert(request, pk):
+	sale = get_object_or_404(Sale.objects.select_related("customer"), pk=pk)
+
+	if request.method != "POST":
+		return _redirect_to_next_or_default(request, "sale_detail", pk=sale.pk)
+
+	if sale.status != RecordStatus.PENDING:
+		messages.error(request, "Alert status can only be changed for pending sales.")
+		return _redirect_to_next_or_default(request, "sale_detail", pk=sale.pk)
+
+	sale.alert_enabled = not sale.alert_enabled
+	sale.save(update_fields=["alert_enabled", "updated_at"])
+
+	state_label = "enabled" if sale.alert_enabled else "disabled"
+	messages.success(request, f"Alerts {state_label} for invoice {sale.invoice_number}.")
+	return _redirect_to_next_or_default(request, "sale_detail", pk=sale.pk)
+
+
+@login_required
+def sale_mark_paid(request, pk):
+	sale = get_object_or_404(Sale.objects.select_related("customer"), pk=pk)
+
+	if request.method != "POST":
+		return _redirect_to_next_or_default(request, "sale_detail", pk=sale.pk)
+
+	if sale.status == RecordStatus.PAID:
+		messages.info(request, f"Invoice {sale.invoice_number} is already paid.")
+		return _redirect_to_next_or_default(request, "sale_detail", pk=sale.pk)
+
+	sale.status = RecordStatus.PAID
+	sale.paid_amount = sale.total_amount
+	sale.alert_enabled = False
+	sale.due_date = None
+	sale.save(update_fields=["status", "paid_amount", "alert_enabled", "due_date", "updated_at"])
+	_sync_paid_sale_income_entry(sale)
+
+	messages.success(request, f"Invoice {sale.invoice_number} marked as paid.")
+	return _redirect_to_next_or_default(request, "sale_detail", pk=sale.pk)
 
 
 @login_required

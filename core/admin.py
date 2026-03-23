@@ -65,6 +65,7 @@ class SaleAdmin(admin.ModelAdmin):
         "paid_amount",
         "due_date",
         "status",
+        "alert_enabled",
     )
     list_filter = ("status", "date", "due_date")
     search_fields = ("invoice_number", "customer__name", "notes")

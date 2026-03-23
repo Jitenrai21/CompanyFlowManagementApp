@@ -9,6 +9,9 @@ from .models import RecordStatus
 
 def _decorate_widget(field_name, field):
     existing_class = field.widget.attrs.get("class", "")
+    if field_name in {"alert_enabled"}:
+        field.widget.attrs["class"] = f"checkbox checkbox-primary {existing_class}".strip()
+        return
     if field_name in {"description", "profile_notes", "address", "items"}:
         field.widget.attrs["class"] = f"textarea textarea-bordered w-full {existing_class}".strip()
     elif field_name in {"type", "payment_method", "customer", "status", "sale"}:
@@ -64,6 +67,7 @@ class SaleForm(forms.ModelForm):
             "date",
             "customer",
             "status",
+            "alert_enabled",
             "items",
             "notes",
             "total_amount",
@@ -145,9 +149,12 @@ class SaleForm(forms.ModelForm):
         cleaned_data = super().clean()
         status = cleaned_data.get("status")
         due_date = cleaned_data.get("due_date")
+        alert_enabled = cleaned_data.get("alert_enabled")
 
         if status == RecordStatus.PAID:
             cleaned_data["due_date"] = None
+            if alert_enabled:
+                cleaned_data["alert_enabled"] = False
         elif not due_date:
             self.add_error("due_date", "Due date is required when sale status is Pending.")
 

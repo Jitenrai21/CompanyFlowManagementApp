@@ -123,6 +123,7 @@ class Sale(TimeStampedModel):
         choices=RecordStatus.choices,
         default=RecordStatus.PENDING,
     )
+    alert_enabled = models.BooleanField(default=False)
 
     class Meta:
         ordering = ["-date", "-created_at"]
@@ -151,6 +152,8 @@ class Sale(TimeStampedModel):
 
     @property
     def alert_state(self):
+        if not self.alert_enabled:
+            return "none"
         if not self.due_date:
             return "none"
         if self.payment_status == "paid":
