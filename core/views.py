@@ -635,6 +635,9 @@ def _customer_payment_context(customer):
 		total_sales=Coalesce(Sum("total_amount"), Value(Decimal("0.00"))),
 		total_paid=Coalesce(Sum("paid_amount"), Value(Decimal("0.00"))),
 	)
+	transaction_totals = customer.transactions.filter(type=TransactionType.INCOME).aggregate(
+		total_income=Coalesce(Sum("amount"), Value(Decimal("0.00"))),
+	)
 	due_amount = payment_totals["total_sales"] - payment_totals["total_paid"]
 	if due_amount < 0:
 		due_amount = Decimal("0.00")
@@ -647,7 +650,7 @@ def _customer_payment_context(customer):
 		"sales_rows": sales_rows,
 		"pending_sales": pending_sales,
 		"pending_sales_rows": pending_sales_rows,
-		"total_payment": payment_totals["total_paid"],
+		"total_payment": transaction_totals["total_income"],
 		"due_amount": due_amount,
 		"manual_due_amount": customer.manual_due_amount,
 		"payment_method_choices": PaymentMethod.choices,
