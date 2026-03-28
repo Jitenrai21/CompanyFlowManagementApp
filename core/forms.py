@@ -1,5 +1,6 @@
 from django import forms
 from django.core.exceptions import ValidationError
+from django.utils import timezone
 from decimal import Decimal, InvalidOperation
 from datetime import datetime
 
@@ -165,6 +166,8 @@ class SaleForm(forms.ModelForm):
         self.fields["invoice_number"].required = False
         self.fields["invoice_number"].widget.attrs["placeholder"] = "Leave blank to auto-generate"
         self.fields["customer"].required = False
+        if not self.is_bound and not (self.instance and self.instance.pk):
+            self.fields["due_date"].initial = timezone.localdate()
         for field_name, field in self.fields.items():
             _decorate_widget(field_name, field)
         self.fields["customer"].widget.attrs["data-customer-autocomplete"] = "true"

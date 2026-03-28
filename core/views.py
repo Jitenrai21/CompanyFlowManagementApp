@@ -49,6 +49,7 @@ MANUAL_DUE_SETTLEMENT_CATEGORY = "Manual Due Settlement"
 CREDIT_TOPUP_CATEGORY = "Customer Credit Top-up"
 JCB_INCOME_CATEGORY = "JCB Income"
 JCB_EXPENSE_CATEGORY = "JCB Expense"
+UNASSIGNED_CUSTOMER_FILTER = "__unassigned__"
 
 
 def _get_or_create_predefined_category(name):
@@ -94,7 +95,6 @@ def _sales_alert_queryset():
 			status=RecordStatus.PENDING,
 			alert_enabled=True,
 			due_date__isnull=False,
-			customer__isnull=False,
 		)
 		.annotate(
 		received_total=Coalesce(
@@ -111,7 +111,9 @@ def _build_alert_items(alert_type="", customer_id="", date_from="", date_to=""):
 
 	sales_queryset = _sales_alert_queryset()
 
-	if customer_id:
+	if customer_id == UNASSIGNED_CUSTOMER_FILTER:
+		sales_queryset = sales_queryset.filter(customer__isnull=True)
+	elif customer_id:
 		sales_queryset = sales_queryset.filter(customer_id=customer_id)
 	if date_from:
 		sales_queryset = sales_queryset.filter(due_date__gte=date_from)
@@ -152,7 +154,9 @@ def _build_alert_items(alert_type="", customer_id="", date_from="", date_to=""):
 		source_type=AlertSource.MANUAL,
 		is_active=True,
 	)
-	if customer_id:
+	if customer_id == UNASSIGNED_CUSTOMER_FILTER:
+		manual_alerts = manual_alerts.filter(customer__isnull=True)
+	elif customer_id:
 		manual_alerts = manual_alerts.filter(customer_id=customer_id)
 	if date_from:
 		manual_alerts = manual_alerts.filter(due_date__gte=date_from)
@@ -197,7 +201,9 @@ def _alerts_context(alert_type="", customer_id="", date_from="", date_to=""):
 	)
 
 	notification_timeline = AlertNotification.objects.select_related("customer")
-	if customer_id:
+	if customer_id == UNASSIGNED_CUSTOMER_FILTER:
+		notification_timeline = notification_timeline.filter(customer__isnull=True)
+	elif customer_id:
 		notification_timeline = notification_timeline.filter(customer_id=customer_id)
 	if date_from:
 		notification_timeline = notification_timeline.filter(due_date__gte=date_from)

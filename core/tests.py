@@ -91,6 +91,10 @@ class SalesWorkflowTests(TestCase):
 		)
 		self.assertTrue(valid_form.is_valid())
 
+	def test_sale_form_defaults_due_date_to_today_for_new_sale(self):
+		form = SaleForm()
+		self.assertEqual(form.fields["due_date"].initial, timezone.localdate())
+
 	def test_inline_receipt_create_links_to_sale(self):
 		self.client.login(username="tester", password="pass1234")
 
@@ -334,3 +338,34 @@ class AlertsWorkflowTests(TestCase):
 		delete_response = self.client.post(reverse("manual_alert_delete", args=[manual_alert.pk]))
 		self.assertEqual(delete_response.status_code, 302)
 		self.assertFalse(AlertNotification.objects.filter(pk=manual_alert.pk).exists())
+
+	def test_unassigned_sale_appears_in_alerts_and_timeline(self):
+		self.client.login(username="alert-user", password="pass1234")
+		today = timezone.localdate()
+		unassigned_sale = Sale.objects.create(
+			invoice_number="INV-A-UNASSIGNED",
+			customer=None,
+			total_amount=Decimal("450.00"),
+			due_date=today - timedelta(days=1),
+			date=today - timedelta(days=5),
+			status="pending",
+			alert_enabled=True,
+			items=[{"item": "U", "quantity": 1, "price": 450}],
+		)
+
+		response = self.client.get(reverse("alerts"))
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, "Invoice INV-A-UNASSIGNED")
+		self.assertContains(response, "NPR 450.00")
+
+		filtered_response = self.client.get(reverse("alerts"), {"customer": "__unassigned__"})
+		self.assertEqual(filtered_response.status_code, 200)
+		self.assertContains(filtered_response, "Invoice INV-A-UNASSIGNED")
+
+		call_command("process_alert_notifications")
+		notification = AlertNotification.objects.filter(
+			source_type=AlertSource.SALE,
+			source_id=unassigned_sale.id,
+		).first()
+		self.assertIsNotNone(notification)
+		self.assertIsNone(notification.customer)

@@ -33,7 +33,6 @@ class Command(BaseCommand):
             status="pending",
             alert_enabled=True,
             due_date__isnull=False,
-            customer__isnull=False,
         )
 
         for sale in sales_queryset:
@@ -53,8 +52,9 @@ class Command(BaseCommand):
             active_signatures.add(signature)
 
             title = f"Invoice {sale.invoice_number} is {alert_type}"
+            customer_label = sale.customer.name if sale.customer else "Unassigned customer"
             message = (
-                f"Customer {sale.customer.name} has outstanding invoice {sale.invoice_number} "
+                f"Customer {customer_label} has outstanding invoice {sale.invoice_number} "
                 f"due on {sale.due_date}."
             )
             amount = sale.total_amount - sale.received_total

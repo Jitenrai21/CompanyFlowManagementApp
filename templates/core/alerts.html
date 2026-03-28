@@ -34,6 +34,7 @@
             <span class="label-text mb-1">Customer</span>
             <select name="customer" class="select select-bordered w-full">
                 <option value="">All</option>
+                <option value="__unassigned__" {% if filters.customer == '__unassigned__' %}selected{% endif %}>Unassigned</option>
                 {% for customer in customers %}
                 <option value="{{ customer.id }}" {% if filters.customer == customer.id|stringformat:'s' %}selected{% endif %}>{{ customer.name }}</option>
                 {% endfor %}
