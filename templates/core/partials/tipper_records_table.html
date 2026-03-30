@@ -20,7 +20,12 @@
                     <td>{{ record.date }}</td>
                     <td>{{ record.item.name }}</td>
                     <td>
-                        <span class="badge badge-sm {% if record.record_type == 'expense' %}badge-error badge-soft{% else %}badge-success badge-soft{% endif %}">
+                        <span class="badge badge-sm whitespace-nowrap gap-1 {% if record.record_type == 'expense' %}badge-error badge-outline{% else %}badge-success badge-outline{% endif %}">
+                            {% if record.record_type == 'expense' %}
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-3.5 w-3.5" aria-hidden="true"><path d="M4 3a1 1 0 00-1 1v12a1 1 0 001.447.894L10 14.118l5.553 2.776A1 1 0 0017 16V4a1 1 0 00-1-1H4z" /></svg>
+                            {% else %}
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-3.5 w-3.5" aria-hidden="true"><path d="M10 2a1 1 0 01.894.553l1.382 2.764 3.052.443a1 1 0 01.554 1.706l-2.208 2.152.521 3.04a1 1 0 01-1.451 1.054L10 12.347l-2.744 1.443a1 1 0 01-1.451-1.054l.52-3.04-2.207-2.152a1 1 0 01.554-1.706l3.052-.443 1.382-2.764A1 1 0 0110 2z" /></svg>
+                            {% endif %}
                             {{ record.get_record_type_display }}
                         </span>
                     </td>

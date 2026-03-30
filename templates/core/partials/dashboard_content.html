@@ -47,28 +47,6 @@
         </div>
     </div>
 
-    <div class="grid gap-4 lg:grid-cols-2">
-        <div class="cf-section">
-            <div class="card-body">
-                <h2 class="card-title text-xl">Income vs Expense</h2>
-                <div class="h-72 cf-chart-shell">
-                    <div id="income-expense-chart" class="h-full w-full" role="img" tabindex="0" aria-label="Income versus expense chart"></div>
-                    <p class="sr-only">Income versus expense comparison chart with interactive legend toggles.</p>
-                </div>
-            </div>
-        </div>
-
-        <div class="cf-section">
-            <div class="card-body">
-                <h2 class="card-title text-xl">Top Customers by Sales</h2>
-                <div class="h-72 cf-chart-shell">
-                    <div id="top-customers-chart" class="h-full w-full" role="img" tabindex="0" aria-label="Top customers by sales chart"></div>
-                    <p class="sr-only">Horizontal ranking chart of top customers and their sales contributions.</p>
-                </div>
-            </div>
-        </div>
-    </div>
-
     <div class="cf-section">
         <div class="card-body gap-4">
             <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -114,28 +92,6 @@
         </div>
     </div>
 
-        <div class="grid gap-4 lg:grid-cols-1">
-        <div class="cf-section">
-            <div class="card-body">
-                <h2 class="card-title text-xl">Top Expense Categories</h2>
-                <div class="h-72 cf-chart-shell">
-                    <div id="category-expense-chart" class="h-full w-full" role="img" tabindex="0" aria-label="Top expense categories pie chart"></div>
-                    <p class="sr-only">Top expense categories pie chart showing which categories account for the most spending.</p>
-                </div>
-            </div>
-        </div>
-
-        <div class="cf-section">
-            <div class="card-body">
-                <h2 class="card-title text-xl">Top Income Categories</h2>
-                <div class="h-72 cf-chart-shell">
-                    <div id="category-income-chart" class="h-full w-full" role="img" tabindex="0" aria-label="Top income categories pie chart"></div>
-                    <p class="sr-only">Top income categories pie chart showing which categories account for the most income.</p>
-                </div>
-            </div>
-        </div>
-    </div>
-    
     <div class="cf-section">
         <div class="card-body gap-4">
             <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -171,6 +127,50 @@
                         <p class="kpi-value !mt-0 js-npr-value" data-npr-value="{{ tipper_summary.net_value }}">NPR {{ tipper_summary.net_value }}</p>
                         <p class="kpi-note">Value Added minus Expense</p>
                     </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+        <div class="grid gap-4 lg:grid-cols-1">
+        <div class="cf-section">
+            <div class="card-body">
+                <h2 class="card-title text-xl">Top Expense Categories</h2>
+                <div class="h-72 cf-chart-shell">
+                    <div id="category-expense-chart" class="h-full w-full" role="img" tabindex="0" aria-label="Top expense categories pie chart"></div>
+                    <p class="sr-only">Top expense categories pie chart showing which categories account for the most spending.</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="cf-section">
+            <div class="card-body">
+                <h2 class="card-title text-xl">Top Income Categories</h2>
+                <div class="h-72 cf-chart-shell">
+                    <div id="category-income-chart" class="h-full w-full" role="img" tabindex="0" aria-label="Top income categories pie chart"></div>
+                    <p class="sr-only">Top income categories pie chart showing which categories account for the most income.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="grid gap-4 lg:grid-cols-2">
+        <div class="cf-section">
+            <div class="card-body">
+                <h2 class="card-title text-xl">Income vs Expense</h2>
+                <div class="h-72 cf-chart-shell">
+                    <div id="income-expense-chart" class="h-full w-full" role="img" tabindex="0" aria-label="Income versus expense chart"></div>
+                    <p class="sr-only">Income versus expense comparison chart with interactive legend toggles.</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="cf-section">
+            <div class="card-body">
+                <h2 class="card-title text-xl">Top Customers by Sales</h2>
+                <div class="h-72 cf-chart-shell">
+                    <div id="top-customers-chart" class="h-full w-full" role="img" tabindex="0" aria-label="Top customers by sales chart"></div>
+                    <p class="sr-only">Horizontal ranking chart of top customers and their sales contributions.</p>
                 </div>
             </div>
         </div>
