@@ -45,7 +45,7 @@
                     <td>NPR {{ sale.received_total }}</td>
                     <td>NPR {{ sale.remaining_balance }}</td>
                     <td>
-                        <span class="badge {% if sale.status == 'paid' %}badge-success{% else %}badge-warning{% endif %}">
+                        <span class="badge {% if sale.status == 'paid' %}badge-success{% else %}badge-warning{% endif %} badge-outline">
                             {{ sale.get_status_display }}
                         </span>
                     </td>
