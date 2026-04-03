@@ -15,6 +15,7 @@ from .models import (
 	AlertType,
 	Customer,
 	CustomerType,
+	RecordStatus,
 	Sale,
 	TipperItem,
 	TipperRecord,
@@ -195,6 +196,168 @@ class DashboardWorkflowTests(TestCase):
 		)
 		self.assertEqual(response.status_code, 200)
 		self.assertNotContains(response, "INV-D-001")
+
+
+class SalePaymentSyncRegressionTests(TestCase):
+	def setUp(self):
+		user_model = get_user_model()
+		self.user = user_model.objects.create_user(username="sync-user", password="pass1234")
+		self.customer = Customer.objects.create(name="Sync Customer", type=CustomerType.REGULAR)
+
+	def _create_sale(self, invoice_number, total="1000.00"):
+		return Sale.objects.create(
+			invoice_number=invoice_number,
+			customer=self.customer,
+			total_amount=Decimal(total),
+			paid_amount=Decimal("0.00"),
+			status="pending",
+			due_date=timezone.localdate(),
+			alert_enabled=True,
+			items=[{"item": "Work", "quantity": 1, "price": float(total)}],
+		)
+
+	def _post_cash_income(self, sale, amount):
+		return self.client.post(
+			reverse("transaction_create"),
+			data={
+				"date": timezone.localdate().isoformat(),
+				"amount": str(amount),
+				"type": TransactionType.INCOME,
+				"payment_method": "cash",
+				"category": "",
+				"description": "Linked payment",
+				"customer": str(self.customer.id),
+				"sale": str(sale.id),
+			},
+		)
+
+	def test_partial_then_full_linked_payment_updates_sale_fields(self):
+		self.client.login(username="sync-user", password="pass1234")
+		sale = self._create_sale("INV-SYNC-001")
+
+		partial_response = self._post_cash_income(sale, "400.00")
+		self.assertEqual(partial_response.status_code, 302)
+		sale.refresh_from_db()
+		self.assertEqual(sale.paid_amount, Decimal("400.00"))
+		self.assertEqual(sale.status, RecordStatus.PENDING)
+
+		full_response = self._post_cash_income(sale, "600.00")
+		self.assertEqual(full_response.status_code, 302)
+		sale.refresh_from_db()
+		self.assertEqual(sale.paid_amount, Decimal("1000.00"))
+		self.assertEqual(sale.status, RecordStatus.PAID)
+
+		sales_response = self.client.get(reverse("sales"))
+		row = sales_response.context["sales"].get(pk=sale.pk)
+		self.assertEqual(row.received_total, Decimal("1000.00"))
+		self.assertEqual(row.remaining_balance, Decimal("0.00"))
+
+	def test_direct_mark_paid_and_linked_completion_reach_same_state(self):
+		self.client.login(username="sync-user", password="pass1234")
+		sale_linked = self._create_sale("INV-SYNC-002")
+		sale_mark_paid = self._create_sale("INV-SYNC-003")
+
+		self._post_cash_income(sale_linked, "400.00")
+		self._post_cash_income(sale_linked, "600.00")
+		mark_response = self.client.post(reverse("sale_mark_paid", args=[sale_mark_paid.pk]))
+		self.assertEqual(mark_response.status_code, 302)
+
+		sale_linked.refresh_from_db()
+		sale_mark_paid.refresh_from_db()
+		self.assertEqual(sale_linked.status, sale_mark_paid.status)
+		self.assertEqual(sale_linked.paid_amount, sale_mark_paid.paid_amount)
+
+	def test_overpayment_keeps_balance_zero_and_status_paid(self):
+		self.client.login(username="sync-user", password="pass1234")
+		sale = self._create_sale("INV-SYNC-004")
+
+		response = self._post_cash_income(sale, "1200.00")
+		self.assertEqual(response.status_code, 302)
+		sale.refresh_from_db()
+		self.assertEqual(sale.status, RecordStatus.PAID)
+		self.assertEqual(sale.paid_amount, Decimal("1200.00"))
+
+		sales_response = self.client.get(reverse("sales"))
+		row = sales_response.context["sales"].get(pk=sale.pk)
+		self.assertEqual(row.remaining_balance, Decimal("0.00"))
+
+	def test_transaction_edit_after_paid_reverts_sale_to_pending_when_needed(self):
+		self.client.login(username="sync-user", password="pass1234")
+		sale = self._create_sale("INV-SYNC-005")
+		tx = Transaction.objects.create(
+			date=timezone.localdate(),
+			amount=Decimal("1000.00"),
+			type=TransactionType.INCOME,
+			payment_method="cash",
+			customer=self.customer,
+			sale=sale,
+		)
+		self.client.post(
+			reverse("transaction_edit", args=[tx.pk]),
+			data={
+				"date": timezone.localdate().isoformat(),
+				"amount": "1000.00",
+				"type": TransactionType.INCOME,
+				"payment_method": "cash",
+				"category": "",
+				"description": "Initial full payment",
+				"customer": str(self.customer.id),
+				"sale": str(sale.id),
+			},
+		)
+		sale.refresh_from_db()
+		self.assertEqual(sale.status, RecordStatus.PAID)
+
+		edit_response = self.client.post(
+			reverse("transaction_edit", args=[tx.pk]),
+			data={
+				"date": timezone.localdate().isoformat(),
+				"amount": "700.00",
+				"type": TransactionType.INCOME,
+				"payment_method": "cash",
+				"category": "",
+				"description": "Adjusted payment",
+				"customer": str(self.customer.id),
+				"sale": str(sale.id),
+			},
+		)
+		self.assertEqual(edit_response.status_code, 302)
+		sale.refresh_from_db()
+		self.assertEqual(sale.paid_amount, Decimal("700.00"))
+		self.assertEqual(sale.status, RecordStatus.PENDING)
+
+	def test_transaction_delete_rolls_back_paid_sale_to_pending(self):
+		self.client.login(username="sync-user", password="pass1234")
+		sale = self._create_sale("INV-SYNC-006")
+		tx = Transaction.objects.create(
+			date=timezone.localdate(),
+			amount=Decimal("1000.00"),
+			type=TransactionType.INCOME,
+			payment_method="cash",
+			customer=self.customer,
+			sale=sale,
+		)
+		self.client.post(
+			reverse("transaction_edit", args=[tx.pk]),
+			data={
+				"date": timezone.localdate().isoformat(),
+				"amount": "1000.00",
+				"type": TransactionType.INCOME,
+				"payment_method": "cash",
+				"category": "",
+				"description": "Confirm full payment",
+				"customer": str(self.customer.id),
+				"sale": str(sale.id),
+			},
+		)
+		sale.refresh_from_db()
+		self.assertEqual(sale.status, RecordStatus.PAID)
+
+		delete_response = self.client.post(reverse("transaction_delete", args=[tx.pk]))
+		self.assertEqual(delete_response.status_code, 302)
+		sale.refresh_from_db()
+		self.assertEqual(sale.paid_amount, Decimal("0.00"))
+		self.assertEqual(sale.status, RecordStatus.PENDING)
 
 
 class AlertsWorkflowTests(TestCase):

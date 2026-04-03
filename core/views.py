@@ -502,6 +502,13 @@ def _sync_paid_sale_income_entry(sale):
 	auto_income_qs.delete()
 
 
+def _sync_sale_after_receipt_change(sale):
+	# Keep sale payment fields and auto-income mirror aligned after receipt mutations.
+	_sync_sale_payment_fields(sale)
+	_sync_paid_sale_income_entry(sale)
+	_sync_sale_payment_fields(sale)
+
+
 def _sync_jcb_transactions(jcb_record):
 	jcb_income_category = _get_or_create_predefined_category(JCB_INCOME_CATEGORY)
 	jcb_expense_category = _get_or_create_predefined_category(JCB_EXPENSE_CATEGORY)
@@ -769,7 +776,11 @@ def transaction_create(request):
 	if request.method == "POST":
 		form = TransactionForm(request.POST, request.FILES)
 		if form.is_valid():
-			form.save()
+			transaction_obj = form.save()
+			if transaction_obj.sale_id:
+				linked_sale = Sale.objects.filter(pk=transaction_obj.sale_id).first()
+				if linked_sale:
+					_sync_sale_after_receipt_change(linked_sale)
 			messages.success(request, "Transaction created successfully.")
 			return redirect("cash_entries")
 		messages.error(request, "Please fix the errors below.")
@@ -791,11 +802,17 @@ def transaction_create(request):
 @login_required
 def transaction_edit(request, pk):
 	transaction = get_object_or_404(Transaction, pk=pk)
+	original_sale_id = transaction.sale_id
 
 	if request.method == "POST":
 		form = TransactionForm(request.POST, request.FILES, instance=transaction)
 		if form.is_valid():
-			form.save()
+			updated_transaction = form.save()
+			sale_ids_to_sync = {sale_id for sale_id in [original_sale_id, updated_transaction.sale_id] if sale_id}
+			for sale_id in sale_ids_to_sync:
+				linked_sale = Sale.objects.filter(pk=sale_id).first()
+				if linked_sale:
+					_sync_sale_after_receipt_change(linked_sale)
 			messages.success(request, "Transaction updated successfully.")
 			return redirect("cash_entries")
 		messages.error(request, "Please fix the errors below.")
@@ -830,9 +847,7 @@ def transaction_delete(request, pk):
 		if linked_sale_id:
 			linked_sale = Sale.objects.filter(pk=linked_sale_id).first()
 			if linked_sale:
-				_sync_sale_payment_fields(linked_sale)
-				_sync_paid_sale_income_entry(linked_sale)
-				_sync_sale_payment_fields(linked_sale)
+				_sync_sale_after_receipt_change(linked_sale)
 	except Exception:
 		if request.headers.get("HX-Request"):
 			return _htmx_feedback_response(
@@ -1152,10 +1167,7 @@ def tipper_record_delete(request, pk):
 @login_required
 def sales(request):
 	queryset = Sale.objects.select_related("customer").annotate(
-		received_total=Coalesce(
-			Sum("receipts__amount", filter=Q(receipts__type=TransactionType.INCOME)),
-			Value(Decimal("0.00")),
-		),
+		received_total=F("paid_amount"),
 	)
 	queryset = queryset.annotate(
 		status_rank=Case(
@@ -1163,7 +1175,11 @@ def sales(request):
 			default=Value(1),
 			output_field=IntegerField(),
 		),
-		remaining_balance=F("total_amount") - F("received_total"),
+		remaining_balance=Case(
+			When(paid_amount__gte=F("total_amount"), then=Value(Decimal("0.00"))),
+			default=F("total_amount") - F("paid_amount"),
+			output_field=DecimalField(max_digits=14, decimal_places=2),
+		),
 	)
 
 	query = request.GET.get("q", "").strip()
@@ -1388,9 +1404,7 @@ def sale_receipt_create(request, pk):
 		if not receipt.category:
 			receipt.category = _get_or_create_predefined_category("Sales Receipt")
 		receipt.save()
-		_sync_sale_payment_fields(sale)
-		_sync_paid_sale_income_entry(sale)
-		_sync_sale_payment_fields(sale)
+		_sync_sale_after_receipt_change(sale)
 		messages.success(request, "Cash receipt added to sale.")
 
 		if request.headers.get("HX-Request"):
@@ -1589,8 +1603,7 @@ def customer_allocate_payment(request, pk):
 			remaining_payment -= allocation_amount
 			allocated_total += allocation_amount
 
-			_sync_sale_payment_fields(sale)
-			_sync_paid_sale_income_entry(sale)
+			_sync_sale_after_receipt_change(sale)
 
 			sale.refresh_from_db(fields=["status", "paid_amount"])
 			if sale.status == RecordStatus.PAID:
