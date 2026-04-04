@@ -197,6 +197,45 @@ class DashboardWorkflowTests(TestCase):
 		self.assertEqual(response.status_code, 200)
 		self.assertNotContains(response, "INV-D-001")
 
+	def test_top_customer_chart_uses_sales_totals_per_customer_record(self):
+		self.client.login(username="dash", password="pass1234")
+
+		# Extra receipt should not inflate sales-based customer ranking totals.
+		Transaction.objects.create(
+			customer=self.customer,
+			sale=self.sale,
+			date="2026-03-07",
+			amount=Decimal("150.00"),
+			type=TransactionType.INCOME,
+			category="Sales Receipt",
+		)
+
+		# Same display name but different customer record should remain a separate bar.
+		other_customer_same_name = Customer.objects.create(
+			name="Dashboard Client",
+			type=CustomerType.REGULAR,
+		)
+		Sale.objects.create(
+			invoice_number="INV-D-002",
+			customer=other_customer_same_name,
+			total_amount=Decimal("800.00"),
+			date="2026-03-02",
+			items=[{"item": "Extra", "quantity": 1, "price": 800}],
+		)
+
+		response = self.client.get(
+			reverse("dashboard"),
+			{"date_from": "2026-03-01", "date_to": "2026-03-31"},
+		)
+		self.assertEqual(response.status_code, 200)
+
+		top_labels = response.context["top_customer_labels"]
+		top_values = response.context["top_customer_values"]
+
+		self.assertEqual(top_labels.count("Dashboard Client"), 2)
+		self.assertIn(1200.0, top_values)
+		self.assertIn(800.0, top_values)
+
 
 class SalePaymentSyncRegressionTests(TestCase):
 	def setUp(self):
@@ -358,6 +397,39 @@ class SalePaymentSyncRegressionTests(TestCase):
 		sale.refresh_from_db()
 		self.assertEqual(sale.paid_amount, Decimal("0.00"))
 		self.assertEqual(sale.status, RecordStatus.PENDING)
+
+	def test_mark_paid_with_existing_partial_receipt_creates_shortfall_income_entry(self):
+		self.client.login(username="sync-user", password="pass1234")
+		sale = self._create_sale("INV-SYNC-007")
+
+		self._post_cash_income(sale, "400.00")
+		response = self.client.post(reverse("sale_mark_paid", args=[sale.pk]))
+		self.assertEqual(response.status_code, 302)
+
+		sale.refresh_from_db()
+		self.assertEqual(sale.status, RecordStatus.PAID)
+		self.assertEqual(sale.paid_amount, Decimal("1000.00"))
+
+		auto_category = TransactionCategory.objects.get(name="Sale Income (Auto)")
+		auto_entries = Transaction.objects.filter(
+			sale=sale,
+			type=TransactionType.INCOME,
+			category=auto_category,
+		)
+		self.assertEqual(auto_entries.count(), 1)
+		self.assertEqual(auto_entries.first().amount, Decimal("600.00"))
+
+	def test_mark_paid_shortfall_income_entry_appears_in_cash_entries(self):
+		self.client.login(username="sync-user", password="pass1234")
+		sale = self._create_sale("INV-SYNC-008")
+		self._post_cash_income(sale, "250.00")
+
+		self.client.post(reverse("sale_mark_paid", args=[sale.pk]))
+
+		cash_response = self.client.get(reverse("cash_entries"))
+		self.assertEqual(cash_response.status_code, 200)
+		self.assertContains(cash_response, "INV-SYNC-008")
+		self.assertContains(cash_response, "Sale Income (Auto)")
 
 
 class AlertsWorkflowTests(TestCase):

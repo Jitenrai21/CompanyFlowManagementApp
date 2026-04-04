@@ -1,38 +1,38 @@
 <div class="space-y-6">
     <div class="grid grid-cols-5 gap-3">
         <div class="cf-kpi-card cf-kpi-card--sales">
-            <div class="min-w-0 space-y-1">
+            <div class="min-w-0 h-full flex flex-col gap-1">
                 <p class="kpi-label !mt-0">Total Sales</p>
                 <p class="kpi-value !mt-0 text-xl leading-tight js-npr-value" data-npr-value="{{ kpis.total_sales }}">NPR {{ kpis.total_sales }}</p>
                 <p class="kpi-note">Gross billed in selected date range</p>
             </div>
         </div>
         <div class="cf-kpi-card cf-kpi-card--income">
-            <div class="min-w-0 space-y-1">
+            <div class="min-w-0 h-full flex flex-col gap-1">
                 <p class="kpi-label !mt-0">Total Income</p>
                 <p class="kpi-value !mt-0 text-xl leading-tight text-success js-npr-value" data-npr-value="{{ kpis.total_income }}">NPR {{ kpis.total_income }}</p>
                 <p class="kpi-note">All recorded incoming cash</p>
             </div>
         </div>
         <div class="cf-kpi-card cf-kpi-card--expense">
-            <div class="min-w-0 space-y-1">
+            <div class="min-w-0 h-full flex flex-col gap-1">
                 <p class="kpi-label !mt-0">Total Expenses</p>
                 <p class="kpi-value !mt-0 text-xl leading-tight text-error js-npr-value" data-npr-value="{{ kpis.total_expenses }}">NPR {{ kpis.total_expenses }}</p>
                 <p class="kpi-note">All recorded outgoing cash</p>
             </div>
         </div>
         <div class="cf-kpi-card cf-kpi-card--receivable">
-            <div class="min-w-0 space-y-1">
+            <div class="min-w-0 h-full flex flex-col gap-1">
                 <p class="kpi-label !mt-0">Outstanding Receivables</p>
                 <p class="kpi-value !mt-0 text-xl leading-tight js-npr-value" data-npr-value="{{ kpis.outstanding_receivables }}">NPR {{ kpis.outstanding_receivables }}</p>
                 <p class="kpi-note">Pending amount from unpaid sales</p>
             </div>
         </div>
         <div class="cf-kpi-card cf-kpi-card--overdue">
-            <div class="min-w-0 space-y-1">
+            <div class="min-w-0 h-full flex flex-col gap-1">
                 <p class="kpi-label !mt-0">Overdue Invoices</p>
                 <p class="kpi-value !mt-0 text-xl leading-tight">{{ kpis.overdue_count }}</p>
-                <p class="text-xs text-base-content/70 leading-tight js-npr-value" data-npr-value="{{ kpis.overdue_amount }}">NPR {{ kpis.overdue_amount }}</p>
+                <p class="kpi-note js-npr-value" data-npr-value="{{ kpis.overdue_amount }}">NPR {{ kpis.overdue_amount }}</p>
             </div>
         </div>
     </div>

@@ -89,6 +89,17 @@ def _dashboard_base_sales_queryset(date_from="", date_to=""):
 	return sales_queryset
 
 
+def _dashboard_sales_amount_queryset(date_from="", date_to=""):
+	sales_queryset = Sale.objects.select_related("customer")
+
+	if date_from:
+		sales_queryset = sales_queryset.filter(date__gte=date_from)
+	if date_to:
+		sales_queryset = sales_queryset.filter(date__lte=date_to)
+
+	return sales_queryset
+
+
 def _sales_alert_queryset():
 	return (
 		Sale.objects.select_related("customer")
@@ -245,6 +256,7 @@ def _alerts_context(alert_type="", customer_id="", date_from="", date_to=""):
 
 def _dashboard_context(date_from="", date_to=""):
 	sales_queryset = _dashboard_base_sales_queryset(date_from, date_to)
+	sales_amount_queryset = _dashboard_sales_amount_queryset(date_from, date_to)
 	transactions_queryset = Transaction.objects.select_related("customer").exclude(
 		category__name=CREDIT_BALANCE_APPLIED_CATEGORY,
 	)
@@ -259,7 +271,7 @@ def _dashboard_context(date_from="", date_to=""):
 		jcb_queryset = jcb_queryset.filter(date__lte=date_to)
 		tipper_queryset = tipper_queryset.filter(date__lte=date_to)
 
-	kpi_sales = sales_queryset.aggregate(
+	kpi_sales = sales_amount_queryset.aggregate(
 		total_sales=Coalesce(Sum("total_amount"), Value(Decimal("0.00"))),
 	)
 	sales_rows = list(sales_queryset)
@@ -327,12 +339,12 @@ def _dashboard_context(date_from="", date_to=""):
 		Decimal("0.00"),
 	)
 
-	recent_sales = sales_queryset.order_by("-date", "-created_at")[:6]
+	recent_sales = sales_amount_queryset.order_by("-date", "-created_at")[:6]
 	recent_transactions = transactions_queryset.order_by("-date", "-created_at")[:6]
 	recent_customers = Customer.objects.order_by("-created_at")[:6]
 
 	trend_rows = (
-		sales_queryset.values("date")
+		sales_amount_queryset.values("date")
 		.annotate(total=Coalesce(Sum("total_amount"), Value(Decimal("0.00"))))
 		.order_by("date")
 	)
@@ -345,9 +357,10 @@ def _dashboard_context(date_from="", date_to=""):
 	]
 
 	top_customer_rows = (
-		sales_queryset.values("customer__name")
+		sales_amount_queryset.filter(customer__isnull=False)
+		.values("customer_id", "customer__name")
 		.annotate(total=Coalesce(Sum("total_amount"), Value(Decimal("0.00"))))
-		.order_by("-total", "customer__name")[:5]
+		.order_by("-total", "customer__name", "customer_id")[:5]
 	)
 	top_customer_labels = [row["customer__name"] for row in top_customer_rows]
 	top_customer_values = [float(row["total"]) for row in top_customer_rows]
@@ -459,25 +472,32 @@ def _redirect_to_next_or_default(request, default_name, **kwargs):
 	return redirect(default_name, **kwargs)
 
 
-def _sync_paid_sale_income_entry(sale):
+def _sync_paid_sale_income_entry(sale, income_date=None, force_paid=False):
 	auto_sale_category = _get_or_create_predefined_category(AUTO_SALE_INCOME_CATEGORY)
 	auto_income_qs = Transaction.objects.filter(
 		sale=sale,
 		type=TransactionType.INCOME,
 		category=auto_sale_category,
 	)
-
-	has_manual_income = sale.receipts.filter(type=TransactionType.INCOME).exclude(
+	manual_income_total = sale.receipts.filter(type=TransactionType.INCOME).exclude(
 		category=auto_sale_category
-	).exists()
+	).aggregate(
+		total=Coalesce(Sum("amount"), Value(Decimal("0.00")))
+	)["total"]
 
-	if sale.status == RecordStatus.PAID and not has_manual_income:
+	should_reconcile_paid = force_paid or sale.status == RecordStatus.PAID
+	shortfall = sale.total_amount - manual_income_total
+	if shortfall < 0:
+		shortfall = Decimal("0.00")
+
+	if should_reconcile_paid and shortfall > 0:
 		auto_income = auto_income_qs.order_by("created_at").first()
 		description = f"{AUTO_SALE_INCOME_DESCRIPTION}: {sale.invoice_number}"
+		entry_date = income_date or sale.date
 
 		if auto_income:
-			auto_income.date = sale.date
-			auto_income.amount = sale.total_amount
+			auto_income.date = entry_date
+			auto_income.amount = shortfall
 			auto_income.customer = sale.customer
 			auto_income.description = description
 			auto_income.save(
@@ -493,8 +513,8 @@ def _sync_paid_sale_income_entry(sale):
 			return
 
 		Transaction.objects.create(
-			date=sale.date,
-			amount=sale.total_amount,
+			date=entry_date,
+			amount=shortfall,
 			type=TransactionType.INCOME,
 			category=auto_sale_category,
 			description=description,
@@ -1275,15 +1295,8 @@ def sale_edit(request, pk):
 			if sale.status == RecordStatus.PAID:
 				sale.alert_enabled = False
 			sale.save()
-			_sync_paid_sale_income_entry(sale)
-			if sale.status == RecordStatus.PAID:
-				sale.paid_amount = sale.total_amount
-			else:
-				summary = sale.receipts.filter(type=TransactionType.INCOME).aggregate(
-					total=Coalesce(Sum("amount"), Value(Decimal("0.00")))
-				)
-				sale.paid_amount = summary["total"]
-			sale.save(update_fields=["paid_amount", "alert_enabled", "updated_at"])
+			_sync_paid_sale_income_entry(sale, force_paid=(sale.status == RecordStatus.PAID))
+			_sync_sale_payment_fields(sale)
 			messages.success(request, "Sale updated successfully.")
 			return redirect("sale_detail", pk=sale.pk)
 		messages.error(request, "Please fix the errors below.")
@@ -1375,11 +1388,11 @@ def sale_mark_paid(request, pk):
 		return _redirect_to_next_or_default(request, "sale_detail", pk=sale.pk)
 
 	sale.status = RecordStatus.PAID
-	sale.paid_amount = sale.total_amount
 	sale.alert_enabled = False
 	sale.due_date = None
-	sale.save(update_fields=["status", "paid_amount", "alert_enabled", "due_date", "updated_at"])
-	_sync_paid_sale_income_entry(sale)
+	sale.save(update_fields=["status", "alert_enabled", "due_date", "updated_at"])
+	_sync_paid_sale_income_entry(sale, income_date=timezone.localdate(), force_paid=True)
+	_sync_sale_payment_fields(sale)
 
 	messages.success(request, f"Invoice {sale.invoice_number} marked as paid.")
 	return _redirect_to_next_or_default(request, "sale_detail", pk=sale.pk)

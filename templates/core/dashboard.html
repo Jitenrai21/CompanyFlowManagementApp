@@ -182,6 +182,19 @@
         });
     }
 
+    function applyKpiLabelAccessibility(root = document) {
+        root.querySelectorAll('.cf-kpi-card .kpi-label').forEach((label) => {
+            const text = (label.textContent || '').trim();
+            if (text) {
+                label.setAttribute('title', text);
+                label.setAttribute('aria-label', text);
+            }
+            if (!label.hasAttribute('tabindex')) {
+                label.setAttribute('tabindex', '0');
+            }
+        });
+    }
+
     function attachResizeObserver(chart, element) {
         if (!chart || !element || !window.ResizeObserver) {
             return;
@@ -809,7 +822,9 @@
             registerChart('categoryIncome', incomeChart, categoryIncomeCanvas);
         }
 
-        applyIndianCurrencyFormatting(document.getElementById('dashboard-content') || document);
+        const dashboardRoot = document.getElementById('dashboard-content') || document;
+        applyIndianCurrencyFormatting(dashboardRoot);
+        applyKpiLabelAccessibility(dashboardRoot);
     }
 
     document.addEventListener('DOMContentLoaded', initDashboardCharts);
