@@ -5,6 +5,7 @@ from decimal import Decimal, InvalidOperation
 from datetime import datetime
 
 from .models import AlertNotification, AlertSource, AlertType, Customer, JCBRecord, Sale, TipperRecord, Transaction
+from .models import TransactionCategory
 from .models import RecordStatus
 
 
@@ -51,6 +52,8 @@ class CustomerForm(forms.ModelForm):
 
 
 class SaleForm(forms.ModelForm):
+    customer_input = forms.CharField(required=False)
+
     @staticmethod
     def _generate_invoice_number(prefix="INV"):
         counter = 1
@@ -151,6 +154,15 @@ class SaleForm(forms.ModelForm):
         status = cleaned_data.get("status")
         due_date = cleaned_data.get("due_date")
         alert_enabled = cleaned_data.get("alert_enabled")
+        customer_name = (cleaned_data.get("customer_input") or "").strip()
+
+        if customer_name:
+            customer = Customer.objects.filter(name__iexact=customer_name).order_by("name").first()
+            if customer is None:
+                customer = Customer.objects.create(name=customer_name)
+            cleaned_data["customer"] = customer
+        else:
+            cleaned_data["customer"] = None
 
         if status == RecordStatus.PAID:
             cleaned_data["due_date"] = None
@@ -166,15 +178,22 @@ class SaleForm(forms.ModelForm):
         self.fields["invoice_number"].required = False
         self.fields["invoice_number"].widget.attrs["placeholder"] = "Leave blank to auto-generate"
         self.fields["customer"].required = False
+        self.fields["customer_input"].widget.attrs["placeholder"] = "Type or choose a customer name"
+        self.fields["customer_input"].widget.attrs["autocomplete"] = "off"
+        self.fields["customer_input"].widget.attrs["list"] = "sale-customer-options"
         if not self.is_bound and not (self.instance and self.instance.pk):
             self.fields["due_date"].initial = timezone.localdate()
+        if self.instance and self.instance.pk and self.instance.customer:
+            self.initial["customer_input"] = self.instance.customer.name
         for field_name, field in self.fields.items():
             _decorate_widget(field_name, field)
-        self.fields["customer"].widget.attrs["data-customer-autocomplete"] = "true"
-        self.fields["customer"].widget.attrs["data-customer-placeholder"] = "Search customer by name..."
 
 
 class TransactionForm(forms.ModelForm):
+    customer_input = forms.CharField(required=False)
+    category_input = forms.CharField(required=False)
+    sale_input = forms.CharField(required=False)
+
     class Meta:
         model = Transaction
         fields = [
@@ -199,17 +218,58 @@ class TransactionForm(forms.ModelForm):
             raise forms.ValidationError("Amount must be greater than 0.")
         return amount
 
+    def clean(self):
+        cleaned_data = super().clean()
+
+        customer_name = (cleaned_data.get("customer_input") or "").strip()
+        if customer_name:
+            customer = Customer.objects.filter(name__iexact=customer_name).order_by("name").first()
+            if customer is None:
+                customer = Customer.objects.create(name=customer_name)
+            cleaned_data["customer"] = customer
+        else:
+            cleaned_data["customer"] = None
+
+        category_name = (cleaned_data.get("category_input") or "").strip()
+        if category_name:
+            category = TransactionCategory.objects.filter(name__iexact=category_name).order_by("name").first()
+            if category is None:
+                category = TransactionCategory.objects.create(name=category_name, is_predefined=False)
+            cleaned_data["category"] = category
+        else:
+            cleaned_data["category"] = None
+
+        sale_value = (cleaned_data.get("sale_input") or "").strip()
+        if sale_value:
+            cleaned_data["sale"] = Sale.objects.filter(invoice_number__iexact=sale_value).order_by("-date").first()
+        else:
+            cleaned_data["sale"] = None
+
+        return cleaned_data
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["customer"].required = False
         self.fields["category"].required = False
+        self.fields["sale"].required = False
+        self.fields["customer_input"].widget.attrs["placeholder"] = "Type or choose a customer name"
+        self.fields["customer_input"].widget.attrs["autocomplete"] = "off"
+        self.fields["customer_input"].widget.attrs["list"] = "txn-customer-options"
+        self.fields["category_input"].widget.attrs["placeholder"] = "Type or choose a category"
+        self.fields["category_input"].widget.attrs["autocomplete"] = "off"
+        self.fields["category_input"].widget.attrs["list"] = "txn-category-options"
+        self.fields["sale_input"].widget.attrs["placeholder"] = "Type or choose invoice number"
+        self.fields["sale_input"].widget.attrs["autocomplete"] = "off"
+        self.fields["sale_input"].widget.attrs["list"] = "txn-sale-options"
+        if self.instance and self.instance.pk:
+            if self.instance.customer:
+                self.initial["customer_input"] = self.instance.customer.name
+            if self.instance.category:
+                self.initial["category_input"] = self.instance.category.name
+            if self.instance.sale:
+                self.initial["sale_input"] = self.instance.sale.invoice_number
         for field_name, field in self.fields.items():
             _decorate_widget(field_name, field)
-        self.fields["customer"].widget.attrs["data-customer-autocomplete"] = "true"
-        self.fields["customer"].widget.attrs["data-customer-placeholder"] = "Search customer by name..."
-        self.fields["category"].widget.attrs["data-category-autocomplete"] = "true"
-        self.fields["category"].widget.attrs["data-category-placeholder"] = "Search or create category..."
-        self.fields["sale"].required = False
 
 
 class SaleReceiptForm(forms.ModelForm):

@@ -548,6 +548,58 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     animation: cf-fade-up 480ms ease both;
 }
 
+@media (max-width: 1024px) {
+    .cf-mobile-hide-chart {
+        display: none !important;
+    }
+
+    .cf-topbar {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .cf-topbar > .flex-none,
+    .cf-topbar > .flex-1 {
+        min-width: 0;
+    }
+
+    .cf-topbar .btn.btn-square {
+        width: 2.5rem;
+        min-width: 2.5rem;
+        height: 2.5rem;
+    }
+
+    .drawer-side {
+        z-index: 40;
+    }
+
+    .cf-brand-link {
+        min-width: 0;
+        max-width: calc(100vw - 10rem);
+    }
+
+    .cf-brand-title {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .cf-topbar-actions {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        flex-shrink: 0;
+    }
+
+    .cf-topbar-actions .btn {
+        min-height: 2.35rem;
+        padding-left: 0.75rem;
+        padding-right: 0.75rem;
+    }
+}
+
 @keyframes cf-fade-up {
     from {
         opacity: 0;
@@ -569,6 +621,14 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 }
 
 @media (max-width: 640px) {
+    .cf-brand-link {
+        max-width: calc(100vw - 8rem);
+    }
+
+    .cf-brand-subtitle {
+        display: none;
+    }
+
     .card {
         border-radius: 0.85rem;
     }

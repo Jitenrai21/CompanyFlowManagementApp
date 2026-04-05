@@ -37,7 +37,7 @@
     </div>
 
     <div id="dashboard-loading" class="htmx-indicator">
-        <div class="grid grid-cols-5 gap-3">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
             <div class="cf-kpi-card h-24 flex flex-col justify-between">
                 <div class="h-2 w-20 cf-skeleton"></div>
                 <div class="h-7 w-28 cf-skeleton"></div>
@@ -77,6 +77,7 @@
         tipperSummary: null
     };
     let chartResizeObservers = [];
+    let dashboardViewportMode = null;
 
     const chartPalette = {
         ink: '#183153',
@@ -286,6 +287,35 @@
         return pairs.filter((item) => item.label && item.value > 0).sort((a, b) => b.value - a.value).slice(0, 8);
     }
 
+    function buildSortedCategoryData(labels, values, limit = 10) {
+        const pairs = (labels || []).map((label, index) => ({
+            name: label || 'Uncategorized',
+            value: numberFrom(values[index])
+        }));
+        const filtered = pairs.filter((item) => item.value > 0).sort((a, b) => b.value - a.value);
+        
+        if (filtered.length <= limit) {
+            return filtered;
+        }
+        
+        const topCategories = filtered.slice(0, limit);
+        const otherCategories = filtered.slice(limit);
+        const othersTotal = otherCategories.reduce((sum, item) => sum + item.value, 0);
+        
+        topCategories.push({
+            name: `Others (${otherCategories.length})`,
+            value: othersTotal
+        });
+        
+        return topCategories;
+    }
+
+    function getCategoryColorPalettes() {
+        const expenseFirst = [chartPalette.coral, chartPalette.amber, chartPalette.blue, chartPalette.mint, chartPalette.violet, chartPalette.slate, chartPalette.cyan, chartPalette.ink];
+        const incomeFirst = [chartPalette.mint, chartPalette.blue, chartPalette.cyan, chartPalette.violet, chartPalette.coral, chartPalette.amber, chartPalette.slate, chartPalette.ink];
+        return { expense: expenseFirst, income: incomeFirst };
+    }
+
     function splitIncomeExpense(labels, values) {
         const normalized = (labels || []).map((label, index) => ({
             label,
@@ -331,10 +361,20 @@
         return { income, expense, hours };
     }
 
+    function isCompactViewport() {
+        return window.matchMedia && window.matchMedia('(max-width: 1024px)').matches;
+    }
+
+    function getDashboardViewportMode() {
+        return isCompactViewport() ? 'compact' : 'desktop';
+    }
+
     function initDashboardCharts() {
         if (!window.echarts) {
             return;
         }
+
+        dashboardViewportMode = getDashboardViewportMode();
 
         injectChartPolishStyles();
 
@@ -360,10 +400,11 @@
         const categoryExpenseCanvas = document.getElementById('category-expense-chart');
         const categoryIncomeCanvas = document.getElementById('category-income-chart');
         const tipperSummaryCanvas = document.getElementById('tipper-summary-chart');
+        const compactViewport = isCompactViewport();
 
         destroyDashboardCharts();
 
-        if (trendCanvas && salesTrendLabels && salesTrendValues) {
+        if (!compactViewport && trendCanvas && salesTrendLabels && salesTrendValues) {
             const salesChart = echarts.init(trendCanvas, null, { renderer: 'canvas' });
             const showZoom = salesTrendLabels.length > 8;
             salesChart.setOption({
@@ -497,7 +538,7 @@
             registerChart('incomeExpense', barChart, pieCanvas);
         }
 
-        if (topCanvas && topCustomerLabels && topCustomerValues) {
+        if (!compactViewport && topCanvas && topCustomerLabels && topCustomerValues) {
             const ranked = sanitizeTopCustomers(topCustomerLabels, topCustomerValues);
             const labels = ranked.map((item) => item.label);
             const values = ranked.map((item) => item.value);
@@ -727,99 +768,105 @@
         }
 
         // Category Expense Pie Chart
-        if (categoryExpenseCanvas && categoryExpenseLabels && categoryExpenseValues) {
-            const expenseChartData = categoryExpenseLabels.map((label, index) => ({
-                name: label || 'Uncategorized',
-                value: categoryExpenseValues[index]
-            }));
-            const expenseChart = echarts.init(categoryExpenseCanvas, null, { renderer: 'canvas' });
-            expenseChart.setOption({
-                animationDuration: 900,
-                color: [chartPalette.coral, chartPalette.amber, chartPalette.blue, chartPalette.mint, chartPalette.violet, chartPalette.slate, chartPalette.cyan, chartPalette.ink],
-                tooltip: {
-                    trigger: 'item',
-                    backgroundColor: 'rgba(15, 23, 42, 0.94)',
-                    borderWidth: 0,
-                    textStyle: { color: '#F8FAFC' },
-                    formatter(params) {
-                        const value = numberFrom(params.value);
-                        const total = expenseChartData.reduce((sum, item) => sum + numberFrom(item.value), 0);
-                        const pct = total > 0 ? ((value / total) * 100).toFixed(1) : '0.0';
-                        return `${params.name}<br/>Expense: ${formatNpr(value)}<br/>Percentage: ${pct}%`;
-                    }
-                },
-                legend: {
-                    top: 'bottom',
-                    textStyle: { color: '#31445F' },
-                    orient: 'vertical',
-                    right: 10
-                },
-                series: [{
-                    type: 'pie',
-                    radius: ['25%', '70%'],
-                    avoidLabelOverlap: true,
-                    itemStyle: { borderRadius: 4, borderColor: '#fff', borderWidth: 2 },
-                    label: {
-                        position: 'outside',
-                        color: '#31445F',
-                        formatter: '{b}',
-                        distanceToLabelLine: 8
+        if (!compactViewport && categoryExpenseCanvas && categoryExpenseLabels && categoryExpenseValues) {
+            const expenseChartData = buildSortedCategoryData(categoryExpenseLabels, categoryExpenseValues, 10);
+            if (expenseChartData.length > 0) {
+                const colorPalettes = getCategoryColorPalettes();
+                const expensePalette = colorPalettes.expense.slice(0, Math.min(expenseChartData.length, 8));
+                const total = expenseChartData.reduce((sum, item) => sum + numberFrom(item.value), 0);
+                const expenseChart = echarts.init(categoryExpenseCanvas, null, { renderer: 'canvas' });
+                expenseChart.setOption({
+                    animationDuration: 900,
+                    color: expensePalette,
+                    tooltip: {
+                        trigger: 'item',
+                        backgroundColor: 'rgba(15, 23, 42, 0.94)',
+                        borderWidth: 0,
+                        textStyle: { color: '#F8FAFC' },
+                        formatter(params) {
+                            const value = numberFrom(params.value);
+                            const pct = total > 0 ? ((value / total) * 100).toFixed(1) : '0.0';
+                            return `${params.name}<br/>Expense: ${formatNpr(value)}<br/>Percentage: ${pct}%`;
+                        }
                     },
-                    emphasis: {
-                        label: { show: true, fontSize: 11, fontWeight: 'bold' }
+                    legend: {
+                        top: 'bottom',
+                        textStyle: { color: '#31445F' },
+                        orient: 'vertical',
+                        right: 10,
+                        data: expenseChartData.map((item) => item.name)
                     },
-                    data: expenseChartData
-                }]
-            });
-            registerChart('categoryExpense', expenseChart, categoryExpenseCanvas);
+                    series: [{
+                        type: 'pie',
+                        center: ['38%', '50%'],
+                        radius: ['25%', '70%'],
+                        avoidLabelOverlap: true,
+                        itemStyle: { borderRadius: 4, borderColor: '#fff', borderWidth: 2 },
+                        label: {
+                            position: 'outside',
+                            color: '#31445F',
+                            formatter: '{b}',
+                            distanceToLabelLine: 8
+                        },
+                        emphasis: {
+                            label: { show: true, fontSize: 11, fontWeight: 'bold' }
+                        },
+                        data: expenseChartData
+                    }]
+                });
+                registerChart('categoryExpense', expenseChart, categoryExpenseCanvas);
+            }
         }
 
         // Category Income Pie Chart
-        if (categoryIncomeCanvas && categoryIncomeLabels && categoryIncomeValues) {
-            const incomeChartData = categoryIncomeLabels.map((label, index) => ({
-                name: label || 'Uncategorized',
-                value: categoryIncomeValues[index]
-            }));
-            const incomeChart = echarts.init(categoryIncomeCanvas, null, { renderer: 'canvas' });
-            incomeChart.setOption({
-                animationDuration: 900,
-                color: [chartPalette.mint, chartPalette.blue, chartPalette.cyan, chartPalette.violet, chartPalette.coral, chartPalette.amber, chartPalette.slate, chartPalette.ink],
-                tooltip: {
-                    trigger: 'item',
-                    backgroundColor: 'rgba(15, 23, 42, 0.94)',
-                    borderWidth: 0,
-                    textStyle: { color: '#F8FAFC' },
-                    formatter(params) {
-                        const value = numberFrom(params.value);
-                        const total = incomeChartData.reduce((sum, item) => sum + numberFrom(item.value), 0);
-                        const pct = total > 0 ? ((value / total) * 100).toFixed(1) : '0.0';
-                        return `${params.name}<br/>Income: ${formatNpr(value)}<br/>Percentage: ${pct}%`;
-                    }
-                },
-                legend: {
-                    top: 'bottom',
-                    textStyle: { color: '#31445F' },
-                    orient: 'vertical',
-                    right: 10
-                },
-                series: [{
-                    type: 'pie',
-                    radius: ['25%', '70%'],
-                    avoidLabelOverlap: true,
-                    itemStyle: { borderRadius: 4, borderColor: '#fff', borderWidth: 2 },
-                    label: {
-                        position: 'outside',
-                        color: '#31445F',
-                        formatter: '{b}',
-                        distanceToLabelLine: 8
+        if (!compactViewport && categoryIncomeCanvas && categoryIncomeLabels && categoryIncomeValues) {
+            const incomeChartData = buildSortedCategoryData(categoryIncomeLabels, categoryIncomeValues, 10);
+            if (incomeChartData.length > 0) {
+                const colorPalettes = getCategoryColorPalettes();
+                const incomePalette = colorPalettes.income.slice(0, Math.min(incomeChartData.length, 8));
+                const total = incomeChartData.reduce((sum, item) => sum + numberFrom(item.value), 0);
+                const incomeChart = echarts.init(categoryIncomeCanvas, null, { renderer: 'canvas' });
+                incomeChart.setOption({
+                    animationDuration: 900,
+                    color: incomePalette,
+                    tooltip: {
+                        trigger: 'item',
+                        backgroundColor: 'rgba(15, 23, 42, 0.94)',
+                        borderWidth: 0,
+                        textStyle: { color: '#F8FAFC' },
+                        formatter(params) {
+                            const value = numberFrom(params.value);
+                            const pct = total > 0 ? ((value / total) * 100).toFixed(1) : '0.0';
+                            return `${params.name}<br/>Income: ${formatNpr(value)}<br/>Percentage: ${pct}%`;
+                        }
                     },
-                    emphasis: {
-                        label: { show: true, fontSize: 11, fontWeight: 'bold' }
+                    legend: {
+                        top: 'bottom',
+                        textStyle: { color: '#31445F' },
+                        orient: 'vertical',
+                        right: 10,
+                        data: incomeChartData.map((item) => item.name)
                     },
-                    data: incomeChartData
-                }]
-            });
-            registerChart('categoryIncome', incomeChart, categoryIncomeCanvas);
+                    series: [{
+                        type: 'pie',
+                        center: ['38%', '50%'],
+                        radius: ['25%', '70%'],
+                        avoidLabelOverlap: true,
+                        itemStyle: { borderRadius: 4, borderColor: '#fff', borderWidth: 2 },
+                        label: {
+                            position: 'outside',
+                            color: '#31445F',
+                            formatter: '{b}',
+                            distanceToLabelLine: 8
+                        },
+                        emphasis: {
+                            label: { show: true, fontSize: 11, fontWeight: 'bold' }
+                        },
+                        data: incomeChartData
+                    }]
+                });
+                registerChart('categoryIncome', incomeChart, categoryIncomeCanvas);
+            }
         }
 
         const dashboardRoot = document.getElementById('dashboard-content') || document;
@@ -829,6 +876,11 @@
 
     document.addEventListener('DOMContentLoaded', initDashboardCharts);
     window.addEventListener('resize', () => {
+        const nextViewportMode = getDashboardViewportMode();
+        if (dashboardViewportMode !== nextViewportMode) {
+            initDashboardCharts();
+            return;
+        }
         Object.values(dashboardCharts).forEach((chart) => {
             if (chart) {
                 chart.resize();

@@ -43,7 +43,7 @@
                     </label>
                 </div>
                 <div class="flex-1 min-w-0">
-                    <a href="{% url 'dashboard' %}" class="inline-flex items-center gap-3 rounded-lg px-2 py-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
+                    <a href="{% url 'dashboard' %}" class="cf-brand-link inline-flex items-center gap-3 rounded-lg px-2 py-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
                         <span class="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden sm:h-16 sm:w-16" aria-hidden="true">
                             <img
                                 src="{% static 'core/CompanyLogo.png' %}"
@@ -52,12 +52,12 @@
                             >
                         </span>
                         <span class="min-w-0">
-                            <span class="block truncate text-sm font-extrabold tracking-tight sm:text-base lg:text-lg">Purba Paschim Construction and Suppliers</span>
-                            <span class="block text-[11px] text-base-content/60 sm:text-xs">Company Flow</span>
+                            <span class="cf-brand-title block truncate text-sm font-extrabold tracking-tight sm:text-base lg:text-lg">Purba Paschim Construction and Suppliers</span>
+                            <span class="cf-brand-subtitle block text-[11px] text-base-content/60 sm:text-xs">Company Flow</span>
                         </span>
                     </a>
                 </div>
-                <div class="flex-none gap-2">
+                <div class="flex-none gap-2 cf-topbar-actions">
                     <span class="hidden sm:inline text-sm text-base-content/70">{{ request.user.username }}</span>
                     <form method="post" action="{% url 'logout' %}">
                         {% csrf_token %}
@@ -196,6 +196,53 @@
             });
         }
 
+        function initResponsiveDrawer() {
+            const drawerToggle = document.getElementById('app-drawer');
+            if (!drawerToggle) {
+                return;
+            }
+
+            const isCompactViewport = () => window.matchMedia && window.matchMedia('(max-width: 1024px)').matches;
+
+            function syncBodyScrollLock() {
+                document.body.style.overflow = drawerToggle.checked && isCompactViewport() ? 'hidden' : '';
+            }
+
+            function closeDrawer() {
+                if (!drawerToggle.checked) {
+                    return;
+                }
+                drawerToggle.checked = false;
+                syncBodyScrollLock();
+            }
+
+            drawerToggle.addEventListener('change', syncBodyScrollLock);
+
+            document.querySelectorAll('.drawer-side .menu a').forEach((link) => {
+                link.addEventListener('click', () => {
+                    if (isCompactViewport()) {
+                        closeDrawer();
+                    }
+                });
+            });
+
+            document.addEventListener('keydown', (event) => {
+                if (event.key === 'Escape') {
+                    closeDrawer();
+                }
+            });
+
+            window.addEventListener('resize', () => {
+                if (!isCompactViewport()) {
+                    closeDrawer();
+                } else {
+                    syncBodyScrollLock();
+                }
+            });
+
+            syncBodyScrollLock();
+        }
+
         function initCustomerAutocomplete() {
             if (!window.TomSelect) {
                 return;
@@ -260,6 +307,7 @@
         }
 
         document.addEventListener('DOMContentLoaded', applyRevealAnimations);
+        document.addEventListener('DOMContentLoaded', initResponsiveDrawer);
         document.addEventListener('DOMContentLoaded', initCustomerAutocomplete);
         document.addEventListener('DOMContentLoaded', initCategoryAutocomplete);
         function showToast(message, level = 'info') {

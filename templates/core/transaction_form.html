@@ -45,20 +45,37 @@
                 {% if form.payment_method.errors %}<p class="text-error text-sm mt-1">{{ form.payment_method.errors|join:', ' }}</p>{% endif %}
             </div>
             <div class="form-control md:col-span-2">
-                <label class="label" for="id_customer"><span class="label-text">Customer Assignment (Optional)</span></label>
-                {{ form.customer }}
-                <p class="text-xs text-base-content/60 mt-1">Search by customer name and choose one profile.</p>
-                {% if form.customer.errors %}<p class="text-error text-sm mt-1">{{ form.customer.errors|join:', ' }}</p>{% endif %}
+                <label class="label" for="id_customer_input"><span class="label-text">Customer Assignment (Optional)</span></label>
+                {{ form.customer_input }}
+                <datalist id="txn-customer-options">
+                    {% for customer in form.fields.customer.queryset %}
+                    <option value="{{ customer.name }}"></option>
+                    {% endfor %}
+                </datalist>
+                <p class="text-xs text-base-content/60 mt-1">Start typing to see matches, or enter a custom customer name.</p>
+                {% if form.customer_input.errors %}<p class="text-error text-sm mt-1">{{ form.customer_input.errors|join:', ' }}</p>{% endif %}
             </div>
             <div class="form-control md:col-span-2">
-                <label class="label" for="id_sale"><span class="label-text">Linked Sale (optional)</span></label>
-                {{ form.sale }}
-                {% if form.sale.errors %}<p class="text-error text-sm mt-1">{{ form.sale.errors|join:', ' }}</p>{% endif %}
+                <label class="label" for="id_sale_input"><span class="label-text">Linked Sale (optional)</span></label>
+                {{ form.sale_input }}
+                <datalist id="txn-sale-options">
+                    {% for sale in form.fields.sale.queryset %}
+                    <option value="{{ sale.invoice_number }}"></option>
+                    {% endfor %}
+                </datalist>
+                <p class="text-xs text-base-content/60 mt-1">Type an invoice number or pick from suggestions. If not matched, linked sale remains empty.</p>
+                {% if form.sale_input.errors %}<p class="text-error text-sm mt-1">{{ form.sale_input.errors|join:', ' }}</p>{% endif %}
             </div>
             <div class="form-control md:col-span-2">
-                <label class="label" for="id_category"><span class="label-text">Category</span></label>
-                {{ form.category }}
-                {% if form.category.errors %}<p class="text-error text-sm mt-1">{{ form.category.errors|join:', ' }}</p>{% endif %}
+                <label class="label" for="id_category_input"><span class="label-text">Category</span></label>
+                {{ form.category_input }}
+                <datalist id="txn-category-options">
+                    {% for category in form.fields.category.queryset %}
+                    <option value="{{ category.name }}"></option>
+                    {% endfor %}
+                </datalist>
+                <p class="text-xs text-base-content/60 mt-1">Start typing to see matches, or enter a custom category.</p>
+                {% if form.category_input.errors %}<p class="text-error text-sm mt-1">{{ form.category_input.errors|join:', ' }}</p>{% endif %}
             </div>
             <div class="form-control md:col-span-2">
                 <label class="label" for="id_description"><span class="label-text">Description</span></label>
