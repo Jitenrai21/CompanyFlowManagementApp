@@ -48,15 +48,6 @@
                                 <a href="{% url 'jcb_record_edit' record.id %}" class="btn btn-xs btn-square btn-outline" title="Edit record" aria-label="Edit JCB record {{ record.id }}">
                                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-3.5 w-3.5" aria-hidden="true"><path d="M13.586 2.586a2 2 0 112.828 2.828l-8.9 8.9a1 1 0 01-.424.26l-3 1a1 1 0 01-1.264-1.264l1-3a1 1 0 01.26-.424l8.9-8.9z" /></svg>
                                 </a>
-                                {% if record.status == 'pending' %}
-                                <form method="post" action="{% url 'jcb_record_mark_paid' record.id %}" class="inline" onsubmit="return confirm('Mark this JCB record as paid?');">
-                                    {% csrf_token %}
-                                    <input type="hidden" name="next" value="{{ request.get_full_path }}">
-                                    <button type="submit" class="btn btn-xs btn-square btn-success btn-outline" title="Mark paid" aria-label="Mark JCB record {{ record.id }} as paid">
-                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-3.5 w-3.5" aria-hidden="true"><path fill-rule="evenodd" d="M16.704 5.29a1 1 0 010 1.42l-7.5 7.5a1 1 0 01-1.415.005l-3.5-3.4a1 1 0 011.394-1.434l2.793 2.714 6.803-6.805a1 1 0 011.425 0z" clip-rule="evenodd" /></svg>
-                                    </button>
-                                </form>
-                                {% endif %}
                                 <form method="post"
                                       action="{% url 'jcb_record_delete' record.id %}"
                                       hx-post="{% url 'jcb_record_delete' record.id %}"
@@ -76,13 +67,6 @@
                                 <div tabindex="0" class="dropdown-content z-[1] mt-2 w-44 rounded-box border border-base-300 bg-base-100 p-2 shadow">
                                     <div class="flex flex-col gap-1">
                                         <a href="{% url 'jcb_record_edit' record.id %}" class="btn btn-xs btn-ghost justify-start">Edit</a>
-                                        {% if record.status == 'pending' %}
-                                        <form method="post" action="{% url 'jcb_record_mark_paid' record.id %}" onsubmit="return confirm('Mark this JCB record as paid?');">
-                                            {% csrf_token %}
-                                            <input type="hidden" name="next" value="{{ request.get_full_path }}">
-                                            <button type="submit" class="btn btn-xs btn-success btn-outline w-full justify-start">Mark Paid</button>
-                                        </form>
-                                        {% endif %}
                                         <form method="post"
                                               action="{% url 'jcb_record_delete' record.id %}"
                                               hx-post="{% url 'jcb_record_delete' record.id %}"

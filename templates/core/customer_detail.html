@@ -90,5 +90,96 @@
             </div>
         </div>
     </div>
+
+    {% if pending_sales_rows %}
+    <div class="cf-table-shell" data-manual-due="{{ customer.manual_due_amount }}">
+        <div class="cf-table-head">
+            <h2 class="font-semibold">Pending Payments</h2>
+            <span class="text-xs text-base-content/60">{{ pending_sales_rows|length }} item{{ pending_sales_rows|length|pluralize }}</span>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="table table-zebra table-md">
+                <thead>
+                    <tr>
+                        <th>Invoice</th>
+                        <th>Date</th>
+                        <th>Items</th>
+                        <th>Total</th>
+                        <th>Paid</th>
+                        <th>Due</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in pending_sales_rows %}
+                    <tr data-pending-row="true" data-total-amount="{{ row.sale.total_amount }}" data-paid-amount="{{ row.sale.paid_amount }}" data-due-amount="{{ row.due_amount }}">
+                        <td><a href="{% url 'sale_detail' row.sale.id %}" class="link link-primary">{{ row.sale.invoice_number }}</a></td>
+                        <td>{{ row.sale.date }}</td>
+                        <td>
+                            {% if row.sale.items %}
+                                <div class="space-y-1 text-xs leading-tight">
+                                    {% for item in row.sale.items %}
+                                        <div>
+                                            <span class="font-medium">{{ item.item }}</span>
+                                            <span class="text-base-content/60">x{{ item.quantity|default:1 }}</span>
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                            {% else %}
+                                <span class="text-base-content/60">No items</span>
+                            {% endif %}
+                        </td>
+                        <td>NPR {{ row.sale.total_amount }}</td>
+                        <td>NPR {{ row.sale.paid_amount }}</td>
+                        <td class="font-semibold text-error">NPR {{ row.due_amount }}</td>
+                        <td>
+                            <span class="badge badge-warning badge-outline">
+                                {{ row.sale.get_status_display }}
+                            </span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot class="text-base">
+                    <tr>
+                        <td colspan="5" class="text-right pr-4">Total Due:</td>
+                        <td class="font-semibold text-error">
+                            <span id="pending-total-due">NPR 0</span>
+                        </td>
+                        <td></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+        
+        {% if customer.manual_due_amount > 0 %}
+        <div class="alert alert-info">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="h-6 w-6 shrink-0 stroke-current"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            <span>
+                Total Due includes <strong>NPR {{ customer.manual_due_amount }}</strong> from legacy manual adjustments plus pending sale dues from above.
+            </span>
+        </div>
+        {% endif %}
+    </div>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const rows = document.querySelectorAll('[data-pending-row="true"]');
+            const tableContainer = document.querySelector('[data-manual-due]');
+            let totalDue = 0;
+            
+            rows.forEach(row => {
+                const dueText = row.dataset.dueAmount || '0';
+                totalDue += parseFloat(dueText.replace(/,/g, ''));
+            });
+            
+            // Add manual due amount
+            const manualDue = tableContainer ? parseFloat(tableContainer.dataset.manualDue || '0') : 0;
+            totalDue += manualDue;
+            
+            document.getElementById('pending-total-due').textContent = 'NPR ' + totalDue.toLocaleString('en-US', {maximumFractionDigits: 2, minimumFractionDigits: 2});
+        });
+    </script>
+    {% endif %}
 </div>
 {% endblock %}
