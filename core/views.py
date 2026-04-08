@@ -320,6 +320,23 @@ def _dashboard_context(date_from="", date_to=""):
 		"total_jcb_expense": jcb_summary_raw["total_jcb_expense"],
 	}
 	jcb_summary["net_value"] = jcb_summary["total_jcb_income"] - jcb_summary["total_jcb_expense"]
+	jcb_summary["outstanding_receivables"] = jcb_queryset.filter(
+		status=RecordStatus.PENDING,
+		total_work_hours__gt=0,
+	).aggregate(
+		total=Coalesce(
+			Sum(
+				Coalesce(
+					F("total_amount"),
+					ExpressionWrapper(
+						F("total_work_hours") * F("rate"),
+						output_field=DecimalField(max_digits=14, decimal_places=2),
+					),
+				),
+			),
+			Value(Decimal("0.00")),
+		),
+	)["total"]
 
 	today = timezone.localdate()
 	overdue_sales = [
@@ -524,6 +541,103 @@ def _sync_paid_sale_income_entry(sale, income_date=None, force_paid=False):
 		return
 
 	auto_income_qs.delete()
+
+
+def _auto_allocate_customer_cash_entry(*, customer, payment_date, payment_amount, payment_method, notes=""):
+	"""Apply a customer cash entry to oldest pending sales, then move excess to credit."""
+	with db_transaction.atomic():
+		customer = Customer.objects.select_for_update().get(pk=customer.pk)
+		pending_sales = list(
+			Sale.objects.select_for_update()
+			.filter(customer=customer, status=RecordStatus.PENDING)
+			.order_by("due_date", "date", "created_at", "id")
+		)
+
+		customer_payment = CustomerPayment.objects.create(
+			customer=customer,
+			payment_date=payment_date,
+			amount=payment_amount,
+			payment_method=payment_method,
+			notes=notes,
+		)
+
+		remaining_payment = payment_amount
+		allocated_total = Decimal("0.00")
+		fully_paid_count = 0
+		partial_count = 0
+
+		for sale in pending_sales:
+			if remaining_payment <= 0:
+				break
+
+			sale_due = sale.total_amount - sale.paid_amount
+			if sale_due <= 0:
+				continue
+
+			allocation_amount = min(remaining_payment, sale_due)
+			if allocation_amount <= 0:
+				continue
+
+			description = f"Auto-allocated cash entry to invoice {sale.invoice_number}"
+			if notes:
+				description = f"{description} | {notes}"
+
+			receipt = Transaction.objects.create(
+				date=payment_date,
+				amount=allocation_amount,
+				type=TransactionType.INCOME,
+				payment_method=payment_method,
+				category=_get_or_create_predefined_category(PAYMENT_ALLOCATION_CATEGORY),
+				description=description,
+				customer=customer,
+				sale=sale,
+			)
+
+			PaymentAllocation.objects.create(
+				customer_payment=customer_payment,
+				sale=sale,
+				transaction=receipt,
+				amount=allocation_amount,
+			)
+
+			remaining_payment -= allocation_amount
+			allocated_total += allocation_amount
+
+			_sync_sale_after_receipt_change(sale)
+
+			sale.refresh_from_db(fields=["status", "paid_amount"])
+			if sale.status == RecordStatus.PAID:
+				fully_paid_count += 1
+			else:
+				partial_count += 1
+
+		if remaining_payment > 0:
+			topup_description = "Unallocated customer payment added to customer credit balance"
+			if notes:
+				topup_description = f"{topup_description} | {notes}"
+
+			Transaction.objects.create(
+				date=payment_date,
+				amount=remaining_payment,
+				type=TransactionType.INCOME,
+				payment_method=payment_method,
+				category=_get_or_create_predefined_category(CREDIT_TOPUP_CATEGORY),
+				description=topup_description,
+				customer=customer,
+			)
+			customer.credit_balance = customer.credit_balance + remaining_payment
+			customer.save(update_fields=["credit_balance", "updated_at"])
+
+		customer_payment.allocated_amount = allocated_total
+		customer_payment.unallocated_amount = remaining_payment
+		customer_payment.save(update_fields=["allocated_amount", "unallocated_amount", "updated_at"])
+
+		return {
+			"allocated_total": allocated_total,
+			"remaining_payment": remaining_payment,
+			"fully_paid_count": fully_paid_count,
+			"partial_count": partial_count,
+		}
 
 
 def _sync_sale_after_receipt_change(sale):
@@ -800,6 +914,37 @@ def transaction_create(request):
 	if request.method == "POST":
 		form = TransactionForm(request.POST, request.FILES)
 		if form.is_valid():
+			customer = form.cleaned_data.get("customer")
+			transaction_type = form.cleaned_data.get("type")
+			linked_sale = form.cleaned_data.get("sale")
+
+			should_auto_allocate = (
+				transaction_type == TransactionType.INCOME
+				and customer is not None
+				and linked_sale is None
+			)
+
+			if should_auto_allocate:
+				allocation_result = _auto_allocate_customer_cash_entry(
+					customer=customer,
+					payment_date=form.cleaned_data["date"],
+					payment_amount=form.cleaned_data["amount"],
+					payment_method=form.cleaned_data.get("payment_method") or PaymentMethod.CASH,
+					notes=(form.cleaned_data.get("description") or "").strip(),
+				)
+
+				summary_text = (
+					f"Auto-allocated payment: NPR {allocation_result['allocated_total']}. "
+					f"{allocation_result['fully_paid_count']} fully paid, "
+					f"{allocation_result['partial_count']} partially paid."
+				)
+				if allocation_result["remaining_payment"] > 0:
+					summary_text += (
+						f" NPR {allocation_result['remaining_payment']} added to customer credit balance."
+					)
+				messages.success(request, summary_text)
+				return redirect("cash_entries")
+
 			transaction_obj = form.save()
 			if transaction_obj.sale_id:
 				linked_sale = Sale.objects.filter(pk=transaction_obj.sale_id).first()

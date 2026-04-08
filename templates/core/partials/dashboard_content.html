@@ -99,7 +99,7 @@
                 <div class="cf-section lg:col-span-2 h-full">
                     <div class="card-body h-full flex flex-col">
                         <h3 class="card-title text-lg">JCB Income, Expense, and Hours</h3>
-                        <div class="cf-chart-shell flex-1 min-h-64 lg:min-h-0">
+                        <div class="cf-chart-shell flex-1 min-h-64 lg:min-h-full">
                             <div id="jcb-summary-chart" class="h-full w-full" role="img" tabindex="0" aria-label="JCB summary chart"></div>
                             <p class="sr-only">JCB summary chart combining income, expense, and total work hours.</p>
                         </div>
@@ -125,6 +125,11 @@
                         <p class="kpi-label !mt-0">Net Value</p>
                         <p class="kpi-value !mt-0 js-npr-value" data-npr-value="{{ jcb_summary.net_value }}">NPR {{ jcb_summary.net_value }}</p>
                         <p class="kpi-note">JCB Income minus JCB Expense</p>
+                    </div>
+                    <div class="cf-kpi-card cf-kpi-card--receivable">
+                        <p class="kpi-label !mt-0">Outstanding Receivables</p>
+                        <p class="kpi-value !mt-0 js-npr-value" data-npr-value="{{ jcb_summary.outstanding_receivables }}">NPR {{ jcb_summary.outstanding_receivables }}</p>
+                        <p class="kpi-note">Pending JCB work amount yet to be received</p>
                     </div>
                 </div>
             </div>
