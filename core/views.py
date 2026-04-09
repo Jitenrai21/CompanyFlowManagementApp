@@ -640,6 +640,43 @@ def _auto_allocate_customer_cash_entry(*, customer, payment_date, payment_amount
 		}
 
 
+def _auto_apply_customer_credit_to_sale(sale, payment_date=None):
+	"""Use available customer credit to settle a pending sale immediately."""
+	if not sale.customer_id or sale.status != RecordStatus.PENDING:
+		return Decimal("0.00")
+
+	with db_transaction.atomic():
+		customer = Customer.objects.select_for_update().get(pk=sale.customer_id)
+		sale = Sale.objects.select_for_update().get(pk=sale.pk)
+
+		if sale.status != RecordStatus.PENDING:
+			return Decimal("0.00")
+
+		sale_due = sale.total_amount - sale.paid_amount
+		if customer.credit_balance <= 0 or sale_due <= 0:
+			return Decimal("0.00")
+
+		applied_amount = min(customer.credit_balance, sale_due)
+		if applied_amount <= 0:
+			return Decimal("0.00")
+
+		Transaction.objects.create(
+			date=payment_date or sale.date,
+			amount=applied_amount,
+			type=TransactionType.INCOME,
+			category=_get_or_create_predefined_category(CREDIT_BALANCE_APPLIED_CATEGORY),
+			description=f"Auto-applied from customer credit balance to invoice {sale.invoice_number}",
+			customer=customer,
+			sale=sale,
+		)
+
+		customer.credit_balance = customer.credit_balance - applied_amount
+		customer.save(update_fields=["credit_balance", "updated_at"])
+
+		_sync_sale_after_receipt_change(sale)
+		return applied_amount
+
+
 def _sync_sale_after_receipt_change(sale):
 	# Keep sale payment fields and auto-income mirror aligned after receipt mutations.
 	_sync_sale_payment_fields(sale)
@@ -876,8 +913,12 @@ def cash_entries(request):
 	}
 	transactions = transactions.order_by(allowed_sorts.get(sort, "-date"), "-created_at")
 
+	paginator = Paginator(transactions, 12)
+	page_obj = paginator.get_page(request.GET.get("page"))
+
 	context = {
-		"transactions": transactions,
+		"transactions": page_obj.object_list,
+		"page_obj": page_obj,
 		"customers": Customer.objects.all(),
 		"categories": TransactionCategory.objects.all().order_by("name"),
 		"filters": {
@@ -1075,8 +1116,12 @@ def jcb_records(request):
 	}
 	queryset = queryset.order_by(allowed_sorts.get(sort, "-date"), "-created_at")
 
+	paginator = Paginator(queryset, 12)
+	page_obj = paginator.get_page(request.GET.get("page"))
+
 	context = {
-		"jcb_records": queryset,
+		"jcb_records": page_obj.object_list,
+		"page_obj": page_obj,
 		"filters": {
 			"q": query,
 			"status": status,
@@ -1383,8 +1428,12 @@ def sales(request):
 	}
 	queryset = queryset.order_by(allowed_sorts.get(sort, "-date"), "-created_at")
 
+	paginator = Paginator(queryset, 12)
+	page_obj = paginator.get_page(request.GET.get("page"))
+
 	context = {
-		"sales": queryset,
+		"sales": page_obj.object_list,
+		"page_obj": page_obj,
 		"customers": Customer.objects.all(),
 		"filters": {
 			"q": query,
@@ -1410,6 +1459,9 @@ def sale_create(request):
 			if sale.status == RecordStatus.PAID:
 				sale.alert_enabled = False
 			sale.save()
+			if sale.status == RecordStatus.PENDING and sale.customer_id:
+				_auto_apply_customer_credit_to_sale(sale)
+				sale.refresh_from_db(fields=["status", "paid_amount"])
 			_sync_paid_sale_income_entry(sale)
 			messages.success(request, "Sale created successfully.")
 			return redirect("sale_detail", pk=sale.pk)
@@ -1440,6 +1492,9 @@ def sale_edit(request, pk):
 			if sale.status == RecordStatus.PAID:
 				sale.alert_enabled = False
 			sale.save()
+			if sale.status == RecordStatus.PENDING and sale.customer_id:
+				_auto_apply_customer_credit_to_sale(sale)
+				sale.refresh_from_db(fields=["status", "paid_amount"])
 			_sync_paid_sale_income_entry(sale, force_paid=(sale.status == RecordStatus.PAID))
 			_sync_sale_payment_fields(sale)
 			messages.success(request, "Sale updated successfully.")
@@ -1480,6 +1535,22 @@ def sale_delete(request, pk):
 
 	try:
 		with db_transaction.atomic():
+			credit_applied_total = Decimal("0.00")
+			if sale.customer_id:
+				credit_applied_total = (
+					Transaction.objects.filter(
+						sale=sale,
+						type=TransactionType.INCOME,
+						category__name=CREDIT_BALANCE_APPLIED_CATEGORY,
+					)
+					.aggregate(total=Coalesce(Sum("amount"), Value(Decimal("0.00"))))["total"]
+				)
+
+				if credit_applied_total > 0:
+					customer = Customer.objects.select_for_update().get(pk=sale.customer_id)
+					customer.credit_balance = customer.credit_balance + credit_applied_total
+					customer.save(update_fields=["credit_balance", "updated_at"])
+
 			Transaction.objects.filter(sale=sale).delete()
 			sale.delete()
 	except Exception:

@@ -431,6 +431,107 @@ class SalePaymentSyncRegressionTests(TestCase):
 		self.assertContains(cash_response, "INV-SYNC-008")
 		self.assertContains(cash_response, "Sale Income (Auto)")
 
+	def test_sale_create_pending_auto_applies_credit_balance(self):
+		self.client.login(username="sync-user", password="pass1234")
+		self.customer.credit_balance = Decimal("500.00")
+		self.customer.save(update_fields=["credit_balance", "updated_at"])
+
+		response = self.client.post(
+			reverse("sale_create"),
+			data={
+				"invoice_number": "INV-SYNC-009",
+				"date": timezone.localdate().isoformat(),
+				"customer": str(self.customer.pk),
+				"customer_input": self.customer.name,
+				"status": RecordStatus.PENDING,
+				"items": json.dumps([
+					{"item": "Service", "quantity": 1, "price": 300, "amount": 300}
+				]),
+				"notes": "Auto credit apply test",
+				"total_amount": "300.00",
+				"due_date": timezone.localdate().isoformat(),
+			},
+		)
+
+		self.assertEqual(response.status_code, 302)
+		sale = Sale.objects.get(invoice_number="INV-SYNC-009")
+		self.customer.refresh_from_db()
+
+		self.assertEqual(sale.status, RecordStatus.PAID)
+		self.assertEqual(sale.paid_amount, Decimal("300.00"))
+		self.assertEqual(self.customer.credit_balance, Decimal("200.00"))
+
+		credit_category = TransactionCategory.objects.get(name="Credit Balance Applied")
+		receipt = Transaction.objects.get(sale=sale, category=credit_category, type=TransactionType.INCOME)
+		self.assertEqual(receipt.amount, Decimal("300.00"))
+
+	def test_sale_edit_pending_auto_applies_credit_balance_partially(self):
+		self.client.login(username="sync-user", password="pass1234")
+		self.customer.credit_balance = Decimal("250.00")
+		self.customer.save(update_fields=["credit_balance", "updated_at"])
+		sale = self._create_sale("INV-SYNC-010", total="700.00")
+
+		response = self.client.post(
+			reverse("sale_edit", args=[sale.pk]),
+			data={
+				"invoice_number": sale.invoice_number,
+				"date": sale.date.isoformat(),
+				"customer": str(self.customer.pk),
+				"customer_input": self.customer.name,
+				"status": RecordStatus.PENDING,
+				"items": json.dumps(sale.items),
+				"notes": sale.notes,
+				"total_amount": "700.00",
+				"due_date": timezone.localdate().isoformat(),
+			},
+		)
+
+		self.assertEqual(response.status_code, 302)
+		sale.refresh_from_db()
+		self.customer.refresh_from_db()
+
+		self.assertEqual(sale.status, RecordStatus.PENDING)
+		self.assertEqual(sale.paid_amount, Decimal("250.00"))
+		self.assertEqual(self.customer.credit_balance, Decimal("0.00"))
+
+		credit_category = TransactionCategory.objects.get(name="Credit Balance Applied")
+		receipt = Transaction.objects.get(sale=sale, category=credit_category, type=TransactionType.INCOME)
+		self.assertEqual(receipt.amount, Decimal("250.00"))
+
+	def test_sale_delete_restores_auto_applied_credit_balance(self):
+		self.client.login(username="sync-user", password="pass1234")
+		self.customer.credit_balance = Decimal("500.00")
+		self.customer.save(update_fields=["credit_balance", "updated_at"])
+
+		create_response = self.client.post(
+			reverse("sale_create"),
+			data={
+				"invoice_number": "INV-SYNC-011",
+				"date": timezone.localdate().isoformat(),
+				"customer": str(self.customer.pk),
+				"customer_input": self.customer.name,
+				"status": RecordStatus.PENDING,
+				"items": json.dumps([
+					{"item": "Service", "quantity": 1, "price": 300, "amount": 300}
+				]),
+				"notes": "Delete fallback test",
+				"total_amount": "300.00",
+				"due_date": timezone.localdate().isoformat(),
+			},
+		)
+		self.assertEqual(create_response.status_code, 302)
+
+		sale = Sale.objects.get(invoice_number="INV-SYNC-011")
+		self.customer.refresh_from_db()
+		self.assertEqual(self.customer.credit_balance, Decimal("200.00"))
+
+		delete_response = self.client.post(reverse("sale_delete", args=[sale.pk]))
+		self.assertEqual(delete_response.status_code, 302)
+
+		self.customer.refresh_from_db()
+		self.assertEqual(self.customer.credit_balance, Decimal("500.00"))
+		self.assertFalse(Sale.objects.filter(invoice_number="INV-SYNC-011").exists())
+
 
 class AlertsWorkflowTests(TestCase):
 	def setUp(self):

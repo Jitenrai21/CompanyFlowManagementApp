@@ -471,7 +471,22 @@
                     markLine: {
                         symbol: 'none',
                         lineStyle: { type: 'dashed', color: chartPalette.amber },
-                        label: { color: chartPalette.ink, formatter: 'Avg {c}' },
+                        label: {
+                            color: chartPalette.ink,
+                            fontSize: 11,
+                            fontWeight: 600,
+                            position: 'insideMiddleTop',
+                            distance: 6,
+                            padding: [2, 7],
+                            borderRadius: 8,
+                            borderWidth: 1,
+                            borderColor: 'rgba(245, 158, 11, 0.32)',
+                            backgroundColor: 'rgba(255, 255, 255, 0.94)',
+                            formatter: (params) => {
+                                const value = numberFrom(params.value);
+                                return `Avg ${formatCompactAxisValue(value)}`;
+                            }
+                        },
                         data: [{ type: 'average', name: 'Avg' }]
                     },
                     data: salesTrendValues
