@@ -108,6 +108,13 @@ class Transaction(TimeStampedModel):
         blank=True,
         null=True,
     )
+    blocks_record = models.ForeignKey(
+        "BlocksRecord",
+        on_delete=models.SET_NULL,
+        related_name="transactions",
+        blank=True,
+        null=True,
+    )
     attachment = models.FileField(upload_to="transactions/", blank=True, null=True)
 
     class Meta:
@@ -383,3 +390,106 @@ class PaymentAllocation(TimeStampedModel):
 
     def __str__(self) -> str:
         return f"{self.sale.invoice_number} <- {self.amount}"
+
+
+class BlocksRecordType(models.TextChoices):
+    INVESTMENT = "investment", "Investment"
+    STOCK = "stock", "Stock (Addition)"
+    SALE = "sale", "Sale"
+
+
+class BlocksUnitType(models.TextChoices):
+    FOUR_INCH = "4_inch", "4 Inch"
+    SIX_INCH = "6_inch", "6 Inch"
+
+
+class BlocksRecord(TimeStampedModel):
+    """Model for managing inventory and investment/sales records for production blocks."""
+    date = models.DateField(default=timezone.now)
+    record_type = models.CharField(
+        max_length=20,
+        choices=BlocksRecordType.choices,
+        help_text="Type of record: investment, stock inventory update, or sale"
+    )
+    
+    # Investment fields (for INVESTMENT and SALE record types)
+    investment = models.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+        blank=True,
+        null=True,
+        help_text="Amount spent on production (for investment records)"
+    )
+    sale_income = models.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+        blank=True,
+        null=True,
+        help_text="Auto-calculated: quantity × price (for sale records)"
+    )
+    
+    # Sale specific fields (for SALE record type)
+    unit_type = models.CharField(
+        max_length=20,
+        choices=BlocksUnitType.choices,
+        blank=True,
+        null=True,
+        help_text="Type of unit: 4 inch or 6 inch"
+    )
+    quantity = models.PositiveIntegerField(
+        blank=True,
+        null=True,
+        help_text="Number of units (for stock addition or sale)"
+    )
+    price_per_unit = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        blank=True,
+        null=True,
+        help_text="Price per unit (for sale records)"
+    )
+    
+    notes = models.TextField(blank=True, help_text="Additional details or remarks")
+    
+    class Meta:
+        ordering = ["-date", "-created_at"]
+        indexes = [
+            models.Index(fields=["date"]),
+            models.Index(fields=["record_type"]),
+            models.Index(fields=["unit_type"]),
+        ]
+    
+    def __str__(self) -> str:
+        return f"{self.get_record_type_display()} - {self.date}"
+    
+    def save(self, *args, **kwargs):
+        """Auto-calculate sale_income for SALE records and validate fields."""
+        if self.record_type == BlocksRecordType.SALE:
+            if self.quantity and self.price_per_unit:
+                quantity_decimal = Decimal(str(self.quantity))
+                price_decimal = Decimal(str(self.price_per_unit))
+                self.sale_income = (quantity_decimal * price_decimal).quantize(Decimal("0.01"))
+            else:
+                self.sale_income = None
+        
+        super().save(*args, **kwargs)
+    
+    @property
+    def is_investment(self) -> bool:
+        """Check if this is an investment record."""
+        return self.record_type == BlocksRecordType.INVESTMENT
+
+    @property
+    def is_financial(self) -> bool:
+        """Backward-compatible alias for investment records."""
+        return self.is_investment
+    
+    @property
+    def is_stock(self) -> bool:
+        """Check if this is a stock record."""
+        return self.record_type == BlocksRecordType.STOCK
+    
+    @property
+    def is_sale(self) -> bool:
+        """Check if this is a sale record."""
+        return self.record_type == BlocksRecordType.SALE

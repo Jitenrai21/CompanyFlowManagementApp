@@ -96,32 +96,36 @@
                 </div>
                 <a href="{% url 'jcb_records' %}" class="btn btn-outline btn-sm">View All JCB Records</a>
             </div>
-            <div class="grid gap-4 lg:grid-cols-3">
-                <div class="cf-section lg:col-span-2 h-full">
-                    <div class="card-body h-full flex flex-col">
-                        <h3 class="card-title text-lg">JCB Income, Expense, and Hours</h3>
-                        <div class="cf-chart-shell flex-1 min-h-64 lg:min-h-full">
-                            <div id="jcb-summary-chart" class="h-full w-full" role="img" tabindex="0" aria-label="JCB summary chart"></div>
-                            <p class="sr-only">JCB summary chart combining income, expense, and total work hours.</p>
+            <div class="space-y-4">
+                <div class="grid gap-4 lg:grid-cols-3">
+                    <div class="cf-section lg:col-span-2 h-full">
+                        <div class="card-body h-full flex flex-col">
+                            <h3 class="card-title text-lg">JCB Income, Expense, and Hours</h3>
+                            <div class="cf-chart-shell flex-1 min-h-64 lg:min-h-full">
+                                <div id="jcb-summary-chart" class="h-full w-full" role="img" tabindex="0" aria-label="JCB summary chart"></div>
+                                <p class="sr-only">JCB summary chart combining income, expense, and total work hours.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
+                        <div class="cf-kpi-card cf-kpi-card--income">
+                            <p class="kpi-label !mt-0">JCB Income</p>
+                            <p class="kpi-value !mt-0 text-success js-npr-value" data-npr-value="{{ jcb_summary.total_jcb_income }}">NPR {{ jcb_summary.total_jcb_income|npr_amount }}</p>
+                            <p class="kpi-note">Income from paid JCB records</p>
+                        </div>
+                        <div class="cf-kpi-card cf-kpi-card--expense">
+                            <p class="kpi-label !mt-0">JCB Expense</p>
+                            <p class="kpi-value !mt-0 text-error js-npr-value" data-npr-value="{{ jcb_summary.total_jcb_expense }}">NPR {{ jcb_summary.total_jcb_expense|npr_amount }}</p>
+                            <p class="kpi-note">Recorded JCB operating expenses</p>
+                        </div>
+                        <div class="cf-kpi-card cf-kpi-card--sales">
+                            <p class="kpi-label !mt-0">Total Work Hours</p>
+                            <p class="kpi-value !mt-0">{{ jcb_summary.total_work_hours }} hrs</p>
+                            <p class="kpi-note">Total JCB hours in selected period</p>
                         </div>
                     </div>
                 </div>
-                <div class="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
-                    <div class="cf-kpi-card cf-kpi-card--income">
-                        <p class="kpi-label !mt-0">JCB Income</p>
-                        <p class="kpi-value !mt-0 text-success js-npr-value" data-npr-value="{{ jcb_summary.total_jcb_income }}">NPR {{ jcb_summary.total_jcb_income|npr_amount }}</p>
-                        <p class="kpi-note">Income from paid JCB records</p>
-                    </div>
-                    <div class="cf-kpi-card cf-kpi-card--expense">
-                        <p class="kpi-label !mt-0">JCB Expense</p>
-                        <p class="kpi-value !mt-0 text-error js-npr-value" data-npr-value="{{ jcb_summary.total_jcb_expense }}">NPR {{ jcb_summary.total_jcb_expense|npr_amount }}</p>
-                        <p class="kpi-note">Recorded JCB operating expenses</p>
-                    </div>
-                    <div class="cf-kpi-card cf-kpi-card--sales">
-                        <p class="kpi-label !mt-0">Total Work Hours</p>
-                        <p class="kpi-value !mt-0">{{ jcb_summary.total_work_hours }} hrs</p>
-                        <p class="kpi-note">Total JCB hours in selected period</p>
-                    </div>
+                <div class="grid gap-3 sm:grid-cols-2">
                     <div class="cf-kpi-card cf-kpi-card--sales">
                         <p class="kpi-label !mt-0">Net Value</p>
                         <p class="kpi-value !mt-0 js-npr-value" data-npr-value="{{ jcb_summary.net_value }}">NPR {{ jcb_summary.net_value|npr_amount }}</p>
@@ -171,6 +175,59 @@
                         <p class="kpi-label !mt-0">Net Value</p>
                         <p class="kpi-value !mt-0 js-npr-value" data-npr-value="{{ tipper_summary.net_value }}">NPR {{ tipper_summary.net_value|npr_amount }}</p>
                         <p class="kpi-note">Value Added minus Expense</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="cf-section">
+        <div class="card-body gap-4">
+            <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                    <h2 class="card-title text-xl">Blocks Records Summary</h2>
+                    <p class="text-sm text-base-content/70">Investment, income, and inventory stock for blocks production in the selected date range.</p>
+                </div>
+                <a href="{% url 'blocks_records' %}" class="btn btn-outline btn-sm">View All Blocks Records</a>
+            </div>
+            <div class="space-y-4">
+                <div class="grid gap-4 lg:grid-cols-3">
+                    <div class="cf-section lg:col-span-2 h-full">
+                        <div class="card-body h-full flex flex-col">
+                            <h3 class="card-title text-lg">Investment vs Sale Income</h3>
+                            <div class="cf-chart-shell flex-1 min-h-64 lg:min-h-full">
+                                <div id="blocks-summary-chart" class="h-full w-full" role="img" tabindex="0" aria-label="Blocks investment versus sale income chart"></div>
+                                <p class="sr-only">Blocks summary chart combining investment and sale income.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
+                        <div class="cf-kpi-card cf-kpi-card--expense">
+                            <p class="kpi-label !mt-0">Total Investment</p>
+                            <p class="kpi-value !mt-0 text-error js-npr-value" data-npr-value="{{ blocks_summary.total_investment }}">NPR {{ blocks_summary.total_investment|npr_amount }}</p>
+                            <p class="kpi-note">Total investment in production</p>
+                        </div>
+                        <div class="cf-kpi-card cf-kpi-card--income">
+                            <p class="kpi-label !mt-0">Sale Income</p>
+                            <p class="kpi-value !mt-0 text-success js-npr-value" data-npr-value="{{ blocks_summary.total_sale_income }}">NPR {{ blocks_summary.total_sale_income|npr_amount }}</p>
+                            <p class="kpi-note">Total income from sales</p>
+                        </div>
+                        <div class="cf-kpi-card cf-kpi-card--sales">
+                            <p class="kpi-label !mt-0">Net Value</p>
+                            <p class="kpi-value !mt-0 js-npr-value" data-npr-value="{{ blocks_summary.net_value }}">NPR {{ blocks_summary.net_value|npr_amount }}</p>
+                            <p class="kpi-note">Sale Income minus Investment</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="grid gap-3 sm:grid-cols-2">
+                    <div class="cf-kpi-card cf-kpi-card--receivable">
+                        <p class="kpi-label !mt-0">4 Inch Stock</p>
+                        <p class="kpi-value !mt-0">{{ blocks_summary.four_inch_stock }}</p>
+                        <p class="kpi-note">Available units in stock</p>
+                    </div>
+                    <div class="cf-kpi-card cf-kpi-card--receivable">
+                        <p class="kpi-label !mt-0">6 Inch Stock</p>
+                        <p class="kpi-value !mt-0">{{ blocks_summary.six_inch_stock }}</p>
+                        <p class="kpi-note">Available units in stock</p>
                     </div>
                 </div>
             </div>
@@ -350,4 +407,6 @@
     {{ category_income_values|json_script:'category-income-values' }}
     {{ tipper_summary_labels|json_script:'tipper-summary-labels' }}
     {{ tipper_summary_values|json_script:'tipper-summary-values' }}
+    {{ blocks_summary_labels|json_script:'blocks-summary-labels' }}
+    {{ blocks_summary_values|json_script:'blocks-summary-values' }}
 </div>

@@ -14,6 +14,7 @@ from django.utils.http import url_has_allowed_host_and_scheme
 from django.utils import timezone
 
 from .forms import (
+	BlocksRecordForm,
 	CustomerForm,
 	JCBRecordForm,
 	ManualAlertForm,
@@ -26,6 +27,9 @@ from .models import (
 	AlertNotification,
 	AlertSource,
 	AlertType,
+	BlocksRecord,
+	BlocksRecordType,
+	BlocksUnitType,
 	Customer,
 	CustomerPayment,
 	JCBRecord,
@@ -275,14 +279,17 @@ def _dashboard_context(date_from="", date_to=""):
 	)
 	jcb_queryset = JCBRecord.objects.all()
 	tipper_queryset = TipperRecord.objects.select_related("item")
+	blocks_queryset = BlocksRecord.objects.all()
 	if date_from:
 		transactions_queryset = transactions_queryset.filter(date__gte=date_from)
 		jcb_queryset = jcb_queryset.filter(date__gte=date_from)
 		tipper_queryset = tipper_queryset.filter(date__gte=date_from)
+		blocks_queryset = blocks_queryset.filter(date__gte=date_from)
 	if date_to:
 		transactions_queryset = transactions_queryset.filter(date__lte=date_to)
 		jcb_queryset = jcb_queryset.filter(date__lte=date_to)
 		tipper_queryset = tipper_queryset.filter(date__lte=date_to)
+		blocks_queryset = blocks_queryset.filter(date__lte=date_to)
 
 	kpi_sales = sales_amount_queryset.aggregate(
 		total_sales=Coalesce(Sum("total_amount"), Value(Decimal("0.00"))),
@@ -440,6 +447,59 @@ def _dashboard_context(date_from="", date_to=""):
 
 	net_income = kpi_income_expense["total_income"] - kpi_income_expense["total_expenses"]
 
+	# Blocks Records Summary
+	blocks_summary_raw = blocks_queryset.aggregate(
+		total_investment=Coalesce(Sum("investment"), Value(Decimal("0.00"))),
+		total_sale_income=Coalesce(Sum("sale_income"), Value(Decimal("0.00"))),
+	)
+	blocks_summary = {
+		"total_investment": blocks_summary_raw["total_investment"],
+		"total_sale_income": blocks_summary_raw["total_sale_income"],
+	}
+	blocks_summary["net_value"] = blocks_summary["total_sale_income"] - blocks_summary["total_investment"]
+	
+	# Calculate available stock by unit type
+	from django.db import models as django_models
+	stock_by_unit = blocks_queryset.filter(
+		record_type=BlocksRecordType.STOCK
+	).values("unit_type").annotate(
+		total_quantity=Coalesce(Sum("quantity"), Value(0))
+	).order_by("unit_type")
+	
+	blocks_summary["four_inch_stock"] = next(
+		(row["total_quantity"] for row in stock_by_unit if row["unit_type"] == BlocksUnitType.FOUR_INCH), 
+		0
+	)
+	blocks_summary["six_inch_stock"] = next(
+		(row["total_quantity"] for row in stock_by_unit if row["unit_type"] == BlocksUnitType.SIX_INCH), 
+		0
+	)
+	
+	# Deduct sold quantities
+	sold_by_unit = blocks_queryset.filter(
+		record_type=BlocksRecordType.SALE
+	).values("unit_type").annotate(
+		total_quantity=Coalesce(Sum("quantity"), Value(0))
+	).order_by("unit_type")
+	
+	four_inch_sold = next(
+		(row["total_quantity"] for row in sold_by_unit if row["unit_type"] == BlocksUnitType.FOUR_INCH), 
+		0
+	)
+	six_inch_sold = next(
+		(row["total_quantity"] for row in sold_by_unit if row["unit_type"] == BlocksUnitType.SIX_INCH), 
+		0
+	)
+	
+	blocks_summary["four_inch_stock"] -= four_inch_sold
+	blocks_summary["six_inch_stock"] -= six_inch_sold
+	
+	blocks_summary_labels = ["Investment", "Sale Income"]
+	blocks_summary_values = [
+		float(blocks_summary["total_investment"]),
+		float(blocks_summary["total_sale_income"]),
+	]
+
 	return {
 		"kpis": {
 			"total_sales": kpi_sales["total_sales"],
@@ -470,6 +530,9 @@ def _dashboard_context(date_from="", date_to=""):
 		"tipper_summary": tipper_summary,
 		"tipper_summary_labels": tipper_summary_labels,
 		"tipper_summary_values": tipper_summary_values,
+		"blocks_summary": blocks_summary,
+		"blocks_summary_labels": blocks_summary_labels,
+		"blocks_summary_values": blocks_summary_values,
 		"filters": {
 			"date_from": date_from,
 			"date_to": date_to,
@@ -2139,3 +2202,175 @@ def manual_alert_delete(request, pk):
 	manual_alert.delete()
 	messages.success(request, "Manual alert deleted successfully.")
 	return redirect("alerts")
+
+
+# BLOCKS RECORDS VIEWS
+
+@login_required
+def blocks_records(request):
+	"""Display list of blocks records with filtering and pagination."""
+	default_from, default_to = _get_default_date_range()
+	queryset = BlocksRecord.objects.all()
+
+	query = request.GET.get("q", "").strip()
+	record_type = request.GET.get("record_type", "").strip()
+	unit_type = request.GET.get("unit_type", "").strip()
+	date_from = request.GET.get("date_from", "").strip() or default_from
+	date_to = request.GET.get("date_to", "").strip() or default_to
+	sort = request.GET.get("sort", "-date")
+
+	if query:
+		queryset = queryset.filter(
+			Q(notes__icontains=query) | Q(record_type__icontains=query)
+		)
+	if record_type:
+		queryset = queryset.filter(record_type=record_type)
+	if unit_type:
+		queryset = queryset.filter(unit_type=unit_type)
+	if date_from:
+		queryset = queryset.filter(date__gte=date_from)
+	if date_to:
+		queryset = queryset.filter(date__lte=date_to)
+
+	allowed_sorts = {
+		"-date": "-date",
+		"date": "date",
+		"-investment": "-investment",
+		"investment": "investment",
+		"-income": "-sale_income",
+		"income": "sale_income",
+	}
+	queryset = queryset.order_by(allowed_sorts.get(sort, "-date"), "-created_at")
+
+	paginator = Paginator(queryset, 20)
+	page_obj = paginator.get_page(request.GET.get("page"))
+
+	context = {
+		"blocks_records": page_obj.object_list,
+		"page_obj": page_obj,
+		"filters": {
+			"q": query,
+			"record_type": record_type,
+			"unit_type": unit_type,
+			"date_from": date_from,
+			"date_to": date_to,
+			"sort": sort,
+		},
+		"record_type_choices": BlocksRecordType.choices,
+		"unit_type_choices": BlocksUnitType.choices,
+	}
+
+	if request.headers.get("HX-Request"):
+		return render(request, "core/partials/blocks_records_table.html", context)
+
+	return render(request, "core/blocks_records.html", context)
+
+
+@login_required
+def blocks_record_create(request):
+	"""Create a new blocks record."""
+	if request.method == "POST":
+		form = BlocksRecordForm(request.POST)
+		if form.is_valid():
+			blocks_record = form.save()
+			
+			# Create related transactions for investment and sale records
+			if blocks_record.is_investment:
+				_create_blocks_investment_transaction(blocks_record)
+			elif blocks_record.is_sale:
+				_create_blocks_sale_transaction(blocks_record)
+			
+			messages.success(request, "Blocks record created successfully.")
+			return redirect("blocks_records")
+		messages.error(request, "Please fix the errors below.")
+	else:
+		form = BlocksRecordForm(initial={"date": timezone.localdate()})
+
+	return render(
+		request,
+		"core/blocks_record_form.html",
+		{
+			"form": form,
+			"form_title": "Add Blocks Record",
+			"submit_label": "Create Record",
+		},
+	)
+
+
+@login_required
+def blocks_record_edit(request, pk):
+	"""Edit an existing blocks record."""
+	blocks_record = get_object_or_404(BlocksRecord, pk=pk)
+
+	if request.method == "POST":
+		form = BlocksRecordForm(request.POST, instance=blocks_record)
+		if form.is_valid():
+			blocks_record = form.save()
+			
+			# Delete old transactions and recreate the linked transaction if needed
+			blocks_record.transactions.all().delete()
+			if blocks_record.is_investment:
+				_create_blocks_investment_transaction(blocks_record)
+			elif blocks_record.is_sale:
+				_create_blocks_sale_transaction(blocks_record)
+			
+			messages.success(request, "Blocks record updated successfully.")
+			return redirect("blocks_records")
+		messages.error(request, "Please fix the errors below.")
+	else:
+		form = BlocksRecordForm(instance=blocks_record)
+
+	return render(
+		request,
+		"core/blocks_record_form.html",
+		{
+			"form": form,
+			"form_title": "Edit Blocks Record",
+			"submit_label": "Update Record",
+		},
+	)
+
+
+@login_required
+def blocks_record_delete(request, pk):
+	"""Delete a blocks record."""
+	blocks_record = get_object_or_404(BlocksRecord, pk=pk)
+
+	if request.method != "POST":
+		return redirect("blocks_records")
+
+	# Delete associated transactions
+	blocks_record.transactions.all().delete()
+	blocks_record.delete()
+	messages.success(request, "Blocks record deleted successfully.")
+	return redirect("blocks_records")
+
+
+def _create_blocks_investment_transaction(blocks_record):
+	"""Create transaction entries for blocks investment records."""
+	BLOCKS_INVESTMENT_CATEGORY = "Blocks Investment"
+	
+	if blocks_record.record_type == BlocksRecordType.INVESTMENT and blocks_record.investment:
+		Transaction.objects.create(
+			date=blocks_record.date,
+			amount=blocks_record.investment,
+			type=TransactionType.EXPENSE,
+			category=_get_or_create_predefined_category(BLOCKS_INVESTMENT_CATEGORY),
+			description=f"Investment for blocks production",
+			blocks_record=blocks_record,
+		)
+
+
+def _create_blocks_sale_transaction(blocks_record):
+	"""Create transaction entries for blocks sale records."""
+	BLOCKS_SALE_INCOME_CATEGORY = "Blocks Sale Income"
+
+	if blocks_record.record_type == BlocksRecordType.SALE and blocks_record.sale_income:
+		Transaction.objects.create(
+			date=blocks_record.date,
+			amount=blocks_record.sale_income,
+			type=TransactionType.INCOME,
+			category=_get_or_create_predefined_category(BLOCKS_SALE_INCOME_CATEGORY),
+			description=f"Income from {blocks_record.unit_type} blocks sale ({blocks_record.quantity} units @ {blocks_record.price_per_unit})",
+			blocks_record=blocks_record,
+		)

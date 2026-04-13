@@ -2,6 +2,9 @@ from django.contrib import admin
 
 from .models import (
     AlertNotification,
+    BlocksRecord,
+    BlocksRecordType,
+    BlocksUnitType,
     Customer,
     CustomerPayment,
     JCBRecord,
@@ -161,3 +164,24 @@ class TipperRecordAdmin(admin.ModelAdmin):
     autocomplete_fields = ("item",)
     date_hierarchy = "date"
     ordering = ("-date", "-created_at")
+
+
+@admin.register(BlocksRecord)
+class BlocksRecordAdmin(admin.ModelAdmin):
+    list_display = (
+        "date",
+        "record_type",
+        "unit_type",
+        "quantity",
+        "investment",
+        "sale_income",
+    )
+    list_filter = ("record_type", "unit_type", "date")
+    search_fields = ("notes",)
+    date_hierarchy = "date"
+    ordering = ("-date", "-created_at")
+    fieldsets = (
+        ("Record Information", {"fields": ("date", "record_type", "notes")}),
+        ("Financial Fields", {"fields": ("investment", "sale_income")}),
+        ("Stock Fields", {"fields": ("unit_type", "quantity", "price_per_unit")}),
+    )

@@ -74,7 +74,8 @@
         incomeExpense: null,
         topCustomers: null,
         jcbSummary: null,
-        tipperSummary: null
+        tipperSummary: null,
+        blocksSummary: null
     };
     let chartResizeObservers = [];
     let dashboardViewportMode = null;
@@ -396,6 +397,8 @@
         const categoryIncomeValues = cleanSeries(readJsonScript('category-income-values'));
         const tipperSummaryLabels = readJsonScript('tipper-summary-labels');
         const tipperSummaryValues = cleanSeries(readJsonScript('tipper-summary-values'));
+        const blocksSummaryLabels = readJsonScript('blocks-summary-labels');
+        const blocksSummaryValues = cleanSeries(readJsonScript('blocks-summary-values'));
 
         const trendCanvas = document.getElementById('sales-trend-chart');
         const pieCanvas = document.getElementById('income-expense-chart');
@@ -404,6 +407,7 @@
         const categoryExpenseCanvas = document.getElementById('category-expense-chart');
         const categoryIncomeCanvas = document.getElementById('category-income-chart');
         const tipperSummaryCanvas = document.getElementById('tipper-summary-chart');
+        const blocksSummaryCanvas = document.getElementById('blocks-summary-chart');
         const compactViewport = isCompactViewport();
 
         destroyDashboardCharts();
@@ -748,6 +752,53 @@
                 }]
             });
             registerChart('tipperSummary', tipperChart, tipperSummaryCanvas);
+        }
+
+        if (blocksSummaryCanvas && blocksSummaryLabels && blocksSummaryValues) {
+            const blocksChart = echarts.init(blocksSummaryCanvas, null, { renderer: 'canvas' });
+            blocksChart.setOption({
+                animationDuration: 860,
+                color: [chartPalette.coral, chartPalette.mint],
+                grid: { left: 18, right: 18, top: 34, bottom: 24, containLabel: true },
+                tooltip: {
+                    trigger: 'axis',
+                    axisPointer: { type: 'shadow' },
+                    backgroundColor: 'rgba(15, 23, 42, 0.94)',
+                    borderWidth: 0,
+                    textStyle: { color: '#F8FAFC' },
+                    formatter(params) {
+                        const item = params[0];
+                        return `${item.axisValue}<br/>Total: ${formatNpr(item.value)}`;
+                    }
+                },
+                xAxis: {
+                    type: 'category',
+                    data: blocksSummaryLabels,
+                    axisLine: { lineStyle: { color: '#D4DFEA' } },
+                    axisLabel: { color: '#516178' }
+                },
+                yAxis: {
+                    type: 'value',
+                    splitLine: { lineStyle: { color: 'rgba(80, 110, 150, 0.12)' } },
+                    axisLabel: { color: '#516178', formatter: (value) => formatNprAxis(value) }
+                },
+                series: [{
+                    type: 'bar',
+                    barMaxWidth: 42,
+                    itemStyle: { borderRadius: [10, 10, 0, 0] },
+                    data: blocksSummaryValues.map((value, index) => ({
+                        value,
+                        itemStyle: { color: index === 0 ? chartPalette.coral : chartPalette.mint }
+                    })),
+                    label: {
+                        show: true,
+                        position: 'top',
+                        color: '#31445F',
+                        formatter: ({ value }) => formatCompactAxisValue(value)
+                    }
+                }]
+            });
+            registerChart('blocksSummary', blocksChart, blocksSummaryCanvas);
         }
 
         // Category Expense Pie Chart

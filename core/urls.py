@@ -47,4 +47,8 @@ urlpatterns = [
         views.alert_notification_resolve,
         name="alert_notification_resolve",
     ),
+    path("blocks-records/", views.blocks_records, name="blocks_records"),
+    path("blocks-records/new/", views.blocks_record_create, name="blocks_record_create"),
+    path("blocks-records/<int:pk>/edit/", views.blocks_record_edit, name="blocks_record_edit"),
+    path("blocks-records/<int:pk>/delete/", views.blocks_record_delete, name="blocks_record_delete"),
 ]
