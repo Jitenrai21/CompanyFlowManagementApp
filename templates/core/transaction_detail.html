@@ -9,7 +9,7 @@
         <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
                 <h1 class="text-3xl font-extrabold tracking-tight">Cash Entry #{{ transaction.id }}</h1>
-                <p class="cf-page-subtitle">Detailed transaction record with linked sale, bamboo, cement, JCB, and customer context.</p>
+                <p class="cf-page-subtitle">Detailed transaction record with linked sale, bamboo, cement, tipper, JCB, and customer context.</p>
             </div>
             <div class="flex gap-2">
                 <a href="{% url 'transaction_edit' transaction.id %}" class="btn btn-outline">Edit Entry</a>
@@ -37,6 +37,7 @@
                     <p><span class="font-semibold">Linked Sale:</span> {% if transaction.sale %}<a href="{% url 'sale_detail' transaction.sale.id %}" class="link link-primary">{{ transaction.sale.invoice_number }}</a>{% else %}None{% endif %}</p>
                     <p><span class="font-semibold">Linked Bamboo Record:</span> {% if transaction.bamboo_record %}<a href="{% url 'bamboo_records' %}" class="link link-primary">{{ transaction.bamboo_record.date }}</a>{% else %}None{% endif %}</p>
                     <p><span class="font-semibold">Linked Cement Record:</span> {% if transaction.cement_record %}<a href="{% url 'cement_records' %}" class="link link-primary">{{ transaction.cement_record.date }}</a>{% else %}None{% endif %}</p>
+                    <p><span class="font-semibold">Linked Tipper Record:</span> {% if transaction.tipper_record %}<a href="{% url 'tipper_record_detail' transaction.tipper_record.id %}" class="link link-primary">{{ transaction.tipper_record.item.name }} ({{ transaction.tipper_record.date }})</a>{% else %}None{% endif %}</p>
                     <p><span class="font-semibold">Linked JCB Record:</span> {% if transaction.jcb_record %}{{ transaction.jcb_record.date }}{% else %}None{% endif %}</p>
                     <p class="md:col-span-2"><span class="font-semibold">Description:</span> {{ transaction.description|default:'-' }}</p>
                     <p class="md:col-span-2">
@@ -88,6 +89,15 @@
                     <p class="text-sm text-base-content/60">Bamboo Context</p>
                     <p class="text-lg font-semibold">{{ transaction.bamboo_record.get_record_type_display }} - {{ transaction.bamboo_record.date }}</p>
                     <a href="{% url 'bamboo_records' %}" class="btn btn-sm btn-outline mt-2">Open Bamboo Records</a>
+                </div>
+            </div>
+            {% endif %}
+            {% if transaction.tipper_record %}
+            <div class="cf-section">
+                <div class="card-body">
+                    <p class="text-sm text-base-content/60">Tipper Context</p>
+                    <p class="text-lg font-semibold">{{ transaction.tipper_record.get_record_type_display }} - {{ transaction.tipper_record.item.name }}</p>
+                    <a href="{% url 'tipper_record_detail' transaction.tipper_record.id %}" class="btn btn-sm btn-outline mt-2">Open Tipper Record</a>
                 </div>
             </div>
             {% endif %}

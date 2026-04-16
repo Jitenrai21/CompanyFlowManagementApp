@@ -61,6 +61,7 @@ CREDIT_TOPUP_CATEGORY = "Customer Credit Top-up"
 CREDIT_BALANCE_APPLIED_CATEGORY = "Credit Balance Applied"
 JCB_INCOME_CATEGORY = "JCB Income"
 JCB_EXPENSE_CATEGORY = "JCB Expense"
+TIPPER_EXPENSE_CATEGORY = "Tipper Expense"
 UNASSIGNED_CUSTOMER_FILTER = "__unassigned__"
 
 
@@ -927,6 +928,49 @@ def _sync_jcb_transactions(jcb_record):
 		expense_qs.delete()
 
 
+def _sync_tipper_expense_transaction(tipper_record):
+	tipper_expense_category = _get_or_create_predefined_category(TIPPER_EXPENSE_CATEGORY)
+	expense_qs = Transaction.objects.filter(
+		tipper_record=tipper_record,
+		type=TransactionType.EXPENSE,
+		category=tipper_expense_category,
+	)
+
+	if tipper_record.record_type == TipperRecordType.EXPENSE and tipper_record.amount and tipper_record.amount > 0:
+		expense_description = f"Tipper expense on {tipper_record.date}: {tipper_record.item.name}"
+		if tipper_record.description:
+			expense_description = f"{expense_description} - {tipper_record.description}"
+
+		expense_txn = expense_qs.order_by("created_at").first()
+		if expense_txn:
+			expense_txn.date = tipper_record.date
+			expense_txn.amount = tipper_record.amount
+			expense_txn.payment_method = PaymentMethod.CASH
+			expense_txn.description = expense_description
+			expense_txn.save(
+				update_fields=[
+					"date",
+					"amount",
+					"payment_method",
+					"description",
+					"updated_at",
+				]
+			)
+			expense_qs.exclude(pk=expense_txn.pk).delete()
+		else:
+			Transaction.objects.create(
+				date=tipper_record.date,
+				amount=tipper_record.amount,
+				type=TransactionType.EXPENSE,
+				payment_method=PaymentMethod.CASH,
+				category=tipper_expense_category,
+				description=expense_description,
+				tipper_record=tipper_record,
+			)
+	else:
+		expense_qs.delete()
+
+
 def _sale_receipt_context(sale, form=None):
 	receipts = sale.receipts.filter(type=TransactionType.INCOME).order_by("date", "created_at")
 	receipt_rows = []
@@ -1033,7 +1077,7 @@ def dashboard(request):
 @login_required
 def cash_entries(request):
 	default_from, default_to = _get_default_date_range()
-	transactions = Transaction.objects.select_related("customer", "sale", "bamboo_record", "cement_record", "jcb_record", "category").exclude(
+	transactions = Transaction.objects.select_related("customer", "sale", "bamboo_record", "cement_record", "jcb_record", "tipper_record", "category").exclude(
 		category__name=CREDIT_BALANCE_APPLIED_CATEGORY,
 	)
 
@@ -1099,7 +1143,7 @@ def cash_entries(request):
 @login_required
 def transaction_detail(request, pk):
 	transaction_obj = get_object_or_404(
-		Transaction.objects.select_related("customer", "sale", "bamboo_record", "cement_record", "jcb_record"),
+		Transaction.objects.select_related("customer", "sale", "bamboo_record", "cement_record", "jcb_record", "tipper_record"),
 		pk=pk,
 	)
 
@@ -1472,7 +1516,9 @@ def tipper_record_create(request):
 	if request.method == "POST":
 		form = TipperRecordForm(request.POST)
 		if form.is_valid():
-			form.save()
+			with db_transaction.atomic():
+				tipper_record = form.save()
+				_sync_tipper_expense_transaction(tipper_record)
 			messages.success(request, "Tipper record created successfully.")
 			return redirect("tipper_records")
 		messages.error(request, "Please fix the errors below.")
@@ -1497,7 +1543,9 @@ def tipper_record_edit(request, pk):
 	if request.method == "POST":
 		form = TipperRecordForm(request.POST, instance=tipper_record)
 		if form.is_valid():
-			form.save()
+			with db_transaction.atomic():
+				tipper_record = form.save()
+				_sync_tipper_expense_transaction(tipper_record)
 			messages.success(request, "Tipper record updated successfully.")
 			return redirect("tipper_records")
 		messages.error(request, "Please fix the errors below.")
@@ -1526,7 +1574,9 @@ def tipper_record_delete(request, pk):
 	record_label = f"{tipper_record.get_record_type_display()} on {tipper_record.date}"
 
 	try:
-		tipper_record.delete()
+		with db_transaction.atomic():
+			Transaction.objects.filter(tipper_record=tipper_record, type=TransactionType.EXPENSE).delete()
+			tipper_record.delete()
 	except Exception:
 		if request.headers.get("HX-Request"):
 			return _htmx_feedback_response(

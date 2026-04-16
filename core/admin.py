@@ -60,18 +60,19 @@ class TransactionAdmin(admin.ModelAdmin):
         "bamboo_record",
         "cement_record",
         "jcb_record",
+        "tipper_record",
         "type",
         "payment_method",
         "category",
         "amount",
     )
-    list_filter = ("type", "payment_method", "date", "category", "sale", "bamboo_record", "cement_record", "jcb_record")
+    list_filter = ("type", "payment_method", "date", "category", "sale", "bamboo_record", "cement_record", "jcb_record", "tipper_record")
     search_fields = (
         "customer__name",
         "category__name",
         "description",
     )
-    autocomplete_fields = ("customer", "sale", "bamboo_record", "cement_record", "jcb_record", "category")
+    autocomplete_fields = ("customer", "sale", "bamboo_record", "cement_record", "jcb_record", "tipper_record", "category")
     date_hierarchy = "date"
     ordering = ("-date",)
 

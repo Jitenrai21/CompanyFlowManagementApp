@@ -952,6 +952,117 @@ class TipperRecordsDescriptionTests(TestCase):
 		self.assertContains(detail_response, "&mdash;", html=False)
 
 
+class TipperExpenseLedgerSyncTests(TestCase):
+	def setUp(self):
+		user_model = get_user_model()
+		self.user = user_model.objects.create_user(username="tipper-sync", password="pass1234")
+		self.item = TipperItem.objects.create(name="Diesel")
+
+	def test_create_expense_creates_global_expense_transaction(self):
+		self.client.login(username="tipper-sync", password="pass1234")
+
+		response = self.client.post(
+			reverse("tipper_record_create"),
+			data={
+				"date": timezone.localdate().isoformat(),
+				"item": str(self.item.id),
+				"record_type": TipperRecordType.EXPENSE,
+				"description": "Fuel refill",
+				"amount": "1200.00",
+			},
+		)
+
+		self.assertEqual(response.status_code, 302)
+		record = TipperRecord.objects.get(item=self.item, record_type=TipperRecordType.EXPENSE)
+		tx = Transaction.objects.get(tipper_record=record)
+		self.assertEqual(tx.type, TransactionType.EXPENSE)
+		self.assertEqual(tx.amount, Decimal("1200.00"))
+		self.assertEqual(tx.category.name, "Tipper Expense")
+
+	def test_create_value_added_does_not_create_global_expense_transaction(self):
+		self.client.login(username="tipper-sync", password="pass1234")
+
+		response = self.client.post(
+			reverse("tipper_record_create"),
+			data={
+				"date": timezone.localdate().isoformat(),
+				"item": str(self.item.id),
+				"record_type": TipperRecordType.VALUE_ADDED,
+				"description": "Backhaul income",
+				"amount": "1800.00",
+			},
+		)
+
+		self.assertEqual(response.status_code, 302)
+		record = TipperRecord.objects.get(item=self.item, record_type=TipperRecordType.VALUE_ADDED)
+		self.assertFalse(Transaction.objects.filter(tipper_record=record, type=TransactionType.EXPENSE).exists())
+
+	def test_edit_expense_to_value_added_removes_global_expense_transaction(self):
+		self.client.login(username="tipper-sync", password="pass1234")
+		record = TipperRecord.objects.create(
+			date=timezone.localdate(),
+			item=self.item,
+			record_type=TipperRecordType.EXPENSE,
+			amount=Decimal("700.00"),
+		)
+
+		self.client.post(
+			reverse("tipper_record_edit", args=[record.pk]),
+			data={
+				"date": timezone.localdate().isoformat(),
+				"item": str(self.item.id),
+				"record_type": TipperRecordType.EXPENSE,
+				"description": "Initial expense",
+				"amount": "700.00",
+			},
+		)
+		self.assertTrue(Transaction.objects.filter(tipper_record=record, type=TransactionType.EXPENSE).exists())
+
+		response = self.client.post(
+			reverse("tipper_record_edit", args=[record.pk]),
+			data={
+				"date": timezone.localdate().isoformat(),
+				"item": str(self.item.id),
+				"record_type": TipperRecordType.VALUE_ADDED,
+				"description": "Converted to value add",
+				"amount": "900.00",
+			},
+		)
+
+		self.assertEqual(response.status_code, 302)
+		record.refresh_from_db()
+		self.assertEqual(record.record_type, TipperRecordType.VALUE_ADDED)
+		self.assertFalse(Transaction.objects.filter(tipper_record=record, type=TransactionType.EXPENSE).exists())
+
+	def test_dashboard_total_expense_includes_tipper_expense_only(self):
+		self.client.login(username="tipper-sync", password="pass1234")
+
+		self.client.post(
+			reverse("tipper_record_create"),
+			data={
+				"date": timezone.localdate().isoformat(),
+				"item": str(self.item.id),
+				"record_type": TipperRecordType.EXPENSE,
+				"description": "Fuel expense",
+				"amount": "500.00",
+			},
+		)
+		self.client.post(
+			reverse("tipper_record_create"),
+			data={
+				"date": timezone.localdate().isoformat(),
+				"item": str(self.item.id),
+				"record_type": TipperRecordType.VALUE_ADDED,
+				"description": "Value add haul",
+				"amount": "2500.00",
+			},
+		)
+
+		response = self.client.get(reverse("dashboard"))
+		self.assertEqual(response.status_code, 200)
+		self.assertEqual(response.context["kpis"]["total_expenses"], Decimal("500.00"))
+
+
 class JCBStatusFilterTests(TestCase):
 	def setUp(self):
 		user_model = get_user_model()

@@ -129,6 +129,13 @@ class Transaction(TimeStampedModel):
         blank=True,
         null=True,
     )
+    tipper_record = models.ForeignKey(
+        "TipperRecord",
+        on_delete=models.SET_NULL,
+        related_name="transactions",
+        blank=True,
+        null=True,
+    )
     attachment = models.FileField(upload_to="transactions/", blank=True, null=True)
 
     class Meta:
