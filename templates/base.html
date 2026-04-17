@@ -212,7 +212,132 @@
     </main>
     {% endif %}
     <div id="cf-toast-stack" class="pointer-events-none fixed right-4 top-4 z-[120] flex w-full max-w-sm flex-col gap-2"></div>
+    {% if user.is_authenticated and user.is_staff or user.is_authenticated and user.is_superuser %}
+    <dialog id="report-export-modal" class="modal">
+        <div class="modal-box cf-export-modal-box w-full max-w-xl">
+            <h3 class="text-lg font-bold" id="report-export-title">Export Report</h3>
+            <p class="mt-1 text-sm text-base-content/70" id="report-export-help">
+                Choose the date range and file format for this report download.
+            </p>
+            <form id="report-export-form" method="get" action="{% url 'export_report' %}" class="cf-export-form mt-4 grid gap-3 sm:grid-cols-2">
+                <input type="hidden" name="report" id="report-export-type" value="">
+                <div>
+                    <label class="label" for="report-export-date-from">
+                        <span class="label-text">From</span>
+                    </label>
+                    <input id="report-export-date-from" type="date" name="date_from" class="input input-bordered w-full">
+                </div>
+                <div>
+                    <label class="label" for="report-export-date-to">
+                        <span class="label-text">To</span>
+                    </label>
+                    <input id="report-export-date-to" type="date" name="date_to" class="input input-bordered w-full">
+                </div>
+                <div class="sm:col-span-2">
+                    <label class="label" for="report-export-format">
+                        <span class="label-text">Format</span>
+                    </label>
+                    <select id="report-export-format" name="format" class="select select-bordered w-full">
+                        <option value="csv" selected>CSV (.csv)</option>
+                        <option value="xls">Excel-compatible (.xls)</option>
+                        <option value="pdf">PDF (.pdf)</option>
+                    </select>
+                </div>
+                <div id="report-export-extra-filters" class="hidden"></div>
+                <div class="sm:col-span-2 rounded-lg border border-base-300 bg-base-200/60 p-3 text-xs text-base-content/70">
+                    Current page filters are automatically included when available.
+                </div>
+                <div class="modal-action sm:col-span-2 mt-0">
+                    <button type="button" class="btn btn-ghost" data-close-export-modal="true">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Download Report</button>
+                </div>
+            </form>
+        </div>
+        <form method="dialog" class="modal-backdrop">
+            <button type="submit" aria-label="Close report export modal">close</button>
+        </form>
+    </dialog>
+    {% endif %}
     <script>
+        function populateExportModal(button) {
+            const modal = document.getElementById('report-export-modal');
+            const form = document.getElementById('report-export-form');
+            const reportTypeInput = document.getElementById('report-export-type');
+            const titleElement = document.getElementById('report-export-title');
+            const helpElement = document.getElementById('report-export-help');
+            const dateFromInput = document.getElementById('report-export-date-from');
+            const dateToInput = document.getElementById('report-export-date-to');
+            const extraFilters = document.getElementById('report-export-extra-filters');
+
+            if (!modal || !form || !reportTypeInput || !titleElement || !helpElement || !dateFromInput || !dateToInput || !extraFilters) {
+                return;
+            }
+
+            reportTypeInput.value = button.dataset.exportReport || '';
+            titleElement.textContent = button.dataset.exportTitle || 'Export Report';
+            helpElement.textContent = button.dataset.exportHelp || 'Choose the date range and file format for this report download.';
+
+            extraFilters.innerHTML = '';
+            dateFromInput.value = button.dataset.exportDefaultDateFrom || '';
+            dateToInput.value = button.dataset.exportDefaultDateTo || '';
+
+            const sourceSelector = button.dataset.exportSourceForm || '';
+            const sourceForm = sourceSelector ? document.querySelector(sourceSelector) : null;
+            if (sourceForm) {
+                const sourceData = new FormData(sourceForm);
+                sourceData.forEach((value, key) => {
+                    if (!value || key === 'csrfmiddlewaretoken' || key === 'page' || key === 'report' || key === 'format') {
+                        return;
+                    }
+                    if (key === 'date_from') {
+                        dateFromInput.value = value;
+                        return;
+                    }
+                    if (key === 'date_to') {
+                        dateToInput.value = value;
+                        return;
+                    }
+
+                    const hiddenInput = document.createElement('input');
+                    hiddenInput.type = 'hidden';
+                    hiddenInput.name = key;
+                    hiddenInput.value = value;
+                    extraFilters.appendChild(hiddenInput);
+                });
+            }
+
+            modal.showModal();
+        }
+
+        function closeExportModal() {
+            const modal = document.getElementById('report-export-modal');
+            if (modal && modal.open) {
+                modal.close();
+            }
+        }
+
+        document.addEventListener('click', (event) => {
+            const openButton = event.target.closest('.js-open-export-modal');
+            if (openButton) {
+                event.preventDefault();
+                populateExportModal(openButton);
+                return;
+            }
+
+            const closeButton = event.target.closest('[data-close-export-modal="true"]');
+            if (closeButton) {
+                event.preventDefault();
+                closeExportModal();
+            }
+        });
+
+        document.addEventListener('submit', (event) => {
+            const form = event.target;
+            if (form && form.id === 'report-export-form') {
+                closeExportModal();
+            }
+        });
+
         function applyRevealAnimations() {
             document.querySelectorAll('.cf-content > *:not(.htmx-indicator)').forEach((element, index) => {
                 element.classList.add('cf-reveal');

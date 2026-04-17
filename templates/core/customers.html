@@ -11,11 +11,16 @@
                 <h1 class="text-3xl font-extrabold tracking-tight">Customers</h1>
                 <p class="cf-page-subtitle">Manage profiles and review linked transactions and sales.</p>
             </div>
-            <a href="{% url 'customer_create' %}" class="btn btn-primary">Add Customer</a>
+            <div class="cf-action-row">
+                {% if request.user.is_staff or request.user.is_superuser %}
+                <button type="button" class="btn btn-outline btn-sm cf-action-export-btn js-open-export-modal" data-export-report="customer_statement" data-export-title="Export Customer Statement" data-export-help="Download customer-wise statement summary for the selected filters and optional date range." data-export-source-form="#customers-filter-form">Export Statement</button>
+                {% endif %}
+                <a href="{% url 'customer_create' %}" class="btn btn-primary btn-sm cf-action-add-btn">Add Customer</a>
+            </div>
         </div>
     </div>
 
-    <form method="get" class="cf-filter-panel grid gap-3 md:grid-cols-3">
+    <form id="customers-filter-form" method="get" class="cf-filter-panel grid gap-3 md:grid-cols-3">
         <label class="form-control">
             <span class="label-text mb-1">Search</span>
             <input type="text" name="q" value="{{ filters.q }}" class="input input-bordered w-full" placeholder="Name, phone, address, credit terms" />

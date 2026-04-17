@@ -10,11 +10,18 @@
                 <h1 class="text-3xl font-extrabold tracking-tight">Sales</h1>
                 <p class="cf-page-subtitle">Track invoices, payment progress, and receipt coverage.</p>
             </div>
-            <a href="{% url 'sale_create' %}" class="btn btn-primary">Add Sale</a>
+            <div class="cf-action-row">
+                {% if request.user.is_staff or request.user.is_superuser %}
+                <button type="button" class="btn btn-outline btn-sm cf-action-export-btn js-open-export-modal" data-export-report="sales" data-export-title="Export Sales Report" data-export-help="Download sales records using the selected filters and date range." data-export-source-form="#sales-filter-form">Export Sales</button>
+                <button type="button" class="btn btn-outline btn-sm cf-action-export-btn js-open-export-modal" data-export-report="due_payments" data-export-title="Export Due Payments" data-export-help="Download due payment records using the selected filters and date range." data-export-source-form="#sales-filter-form">Export Dues</button>
+                {% endif %}
+                <a href="{% url 'sale_create' %}" class="btn btn-primary btn-sm cf-action-add-btn">Add Sale</a>
+            </div>
         </div>
     </div>
 
     <form
+        id="sales-filter-form"
         method="get"
         class="cf-filter-panel grid gap-3 md:grid-cols-2 lg:grid-cols-7"
         hx-get="{% url 'sales' %}"

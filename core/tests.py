@@ -6,7 +6,7 @@ from django.contrib.auth import get_user_model
 from django.core.management import call_command
 from django.test import TestCase
 from django.urls import reverse
-from django.utils import timezone
+from django.utils import timezone\n\nfrom .bs_dates import bs_add_days, bs_today_date
 
 from .forms import SaleForm
 from .models import (
@@ -115,7 +115,7 @@ class SalesWorkflowTests(TestCase):
 
 	def test_sale_form_defaults_due_date_to_today_for_new_sale(self):
 		form = SaleForm()
-		self.assertEqual(form.fields["due_date"].initial, timezone.localdate())
+		self.assertEqual(form.fields["due_date"].initial, bs_today_date())
 
 	def test_inline_receipt_create_links_to_sale(self):
 		self.client.login(username="tester", password="pass1234")
@@ -258,7 +258,7 @@ class SalePaymentSyncRegressionTests(TestCase):
 			total_amount=Decimal(total),
 			paid_amount=Decimal("0.00"),
 			status="pending",
-			due_date=timezone.localdate(),
+			due_date=bs_today_date(),
 			alert_enabled=True,
 			items=[{"item": "Work", "quantity": 1, "price": float(total)}],
 		)
@@ -267,7 +267,7 @@ class SalePaymentSyncRegressionTests(TestCase):
 		return self.client.post(
 			reverse("transaction_create"),
 			data={
-				"date": timezone.localdate().isoformat(),
+				"date": bs_today_date().isoformat(),
 				"amount": str(amount),
 				"type": TransactionType.INCOME,
 				"payment_method": "cash",
@@ -332,7 +332,7 @@ class SalePaymentSyncRegressionTests(TestCase):
 		self.client.login(username="sync-user", password="pass1234")
 		sale = self._create_sale("INV-SYNC-005")
 		tx = Transaction.objects.create(
-			date=timezone.localdate(),
+			date=bs_today_date(),
 			amount=Decimal("1000.00"),
 			type=TransactionType.INCOME,
 			payment_method="cash",
@@ -342,7 +342,7 @@ class SalePaymentSyncRegressionTests(TestCase):
 		self.client.post(
 			reverse("transaction_edit", args=[tx.pk]),
 			data={
-				"date": timezone.localdate().isoformat(),
+				"date": bs_today_date().isoformat(),
 				"amount": "1000.00",
 				"type": TransactionType.INCOME,
 				"payment_method": "cash",
@@ -358,7 +358,7 @@ class SalePaymentSyncRegressionTests(TestCase):
 		edit_response = self.client.post(
 			reverse("transaction_edit", args=[tx.pk]),
 			data={
-				"date": timezone.localdate().isoformat(),
+				"date": bs_today_date().isoformat(),
 				"amount": "700.00",
 				"type": TransactionType.INCOME,
 				"payment_method": "cash",
@@ -377,7 +377,7 @@ class SalePaymentSyncRegressionTests(TestCase):
 		self.client.login(username="sync-user", password="pass1234")
 		sale = self._create_sale("INV-SYNC-006")
 		tx = Transaction.objects.create(
-			date=timezone.localdate(),
+			date=bs_today_date(),
 			amount=Decimal("1000.00"),
 			type=TransactionType.INCOME,
 			payment_method="cash",
@@ -387,7 +387,7 @@ class SalePaymentSyncRegressionTests(TestCase):
 		self.client.post(
 			reverse("transaction_edit", args=[tx.pk]),
 			data={
-				"date": timezone.localdate().isoformat(),
+				"date": bs_today_date().isoformat(),
 				"amount": "1000.00",
 				"type": TransactionType.INCOME,
 				"payment_method": "cash",
@@ -448,7 +448,7 @@ class SalePaymentSyncRegressionTests(TestCase):
 			reverse("sale_create"),
 			data={
 				"invoice_number": "INV-SYNC-009",
-				"date": timezone.localdate().isoformat(),
+				"date": bs_today_date().isoformat(),
 				"customer": str(self.customer.pk),
 				"customer_input": self.customer.name,
 				"status": RecordStatus.PENDING,
@@ -457,7 +457,7 @@ class SalePaymentSyncRegressionTests(TestCase):
 				]),
 				"notes": "Auto credit apply test",
 				"total_amount": "300.00",
-				"due_date": timezone.localdate().isoformat(),
+				"due_date": bs_today_date().isoformat(),
 			},
 		)
 
@@ -490,7 +490,7 @@ class SalePaymentSyncRegressionTests(TestCase):
 				"items": json.dumps(sale.items),
 				"notes": sale.notes,
 				"total_amount": "700.00",
-				"due_date": timezone.localdate().isoformat(),
+				"due_date": bs_today_date().isoformat(),
 			},
 		)
 
@@ -515,7 +515,7 @@ class SalePaymentSyncRegressionTests(TestCase):
 			reverse("sale_create"),
 			data={
 				"invoice_number": "INV-SYNC-011",
-				"date": timezone.localdate().isoformat(),
+				"date": bs_today_date().isoformat(),
 				"customer": str(self.customer.pk),
 				"customer_input": self.customer.name,
 				"status": RecordStatus.PENDING,
@@ -524,7 +524,7 @@ class SalePaymentSyncRegressionTests(TestCase):
 				]),
 				"notes": "Delete fallback test",
 				"total_amount": "300.00",
-				"due_date": timezone.localdate().isoformat(),
+				"due_date": bs_today_date().isoformat(),
 			},
 		)
 		self.assertEqual(create_response.status_code, 302)
@@ -546,7 +546,7 @@ class AlertsWorkflowTests(TestCase):
 		user_model = get_user_model()
 		self.user = user_model.objects.create_user(username="alert-user", password="pass1234")
 		self.customer = Customer.objects.create(name="Alert Customer", type=CustomerType.REGULAR)
-		today = timezone.localdate()
+		today = bs_today_date()
 
 		self.overdue_sale = Sale.objects.create(
 			invoice_number="INV-A-OVERDUE",
@@ -561,7 +561,7 @@ class AlertsWorkflowTests(TestCase):
 			invoice_number="INV-A-UPCOMING",
 			customer=self.customer,
 			total_amount=Decimal("800.00"),
-			due_date=today + timedelta(days=3),
+			due_date=bs_add_days(today, 3),
 			date=today,
 			items=[{"item": "B", "quantity": 1, "price": 800}],
 		)
@@ -620,7 +620,7 @@ class AlertsWorkflowTests(TestCase):
 		response = self.client.post(
 			reverse("manual_alert_create"),
 			data={
-				"due_date": timezone.localdate().isoformat(),
+				"due_date": bs_today_date().isoformat(),
 				"title": "Follow up call",
 				"message": "Call customer for pending documents.",
 				"alert_type": "",
@@ -640,7 +640,7 @@ class AlertsWorkflowTests(TestCase):
 
 	def test_manual_alert_duplicate_validation(self):
 		self.client.login(username="alert-user", password="pass1234")
-		due_date = timezone.localdate().isoformat()
+		due_date = bs_today_date().isoformat()
 
 		AlertNotification.objects.create(
 			alert_type=AlertType.MANUAL,
@@ -676,7 +676,7 @@ class AlertsWorkflowTests(TestCase):
 			source_type=AlertSource.MANUAL,
 			source_id=None,
 			customer=None,
-			due_date=timezone.localdate(),
+			due_date=bs_today_date(),
 			amount=Decimal("0.00"),
 			title="Initial Alert",
 			message="Initial message",
@@ -685,7 +685,7 @@ class AlertsWorkflowTests(TestCase):
 		edit_response = self.client.post(
 			reverse("manual_alert_edit", args=[manual_alert.pk]),
 			data={
-				"due_date": timezone.localdate().isoformat(),
+				"due_date": bs_today_date().isoformat(),
 				"title": "Updated Alert",
 				"message": "Updated message",
 				"alert_type": "upcoming",
@@ -720,7 +720,7 @@ class CustomerDueCreditBehaviorTests(TestCase):
 			customer=self.customer,
 			total_amount=Decimal("1000.00"),
 			paid_amount=Decimal("0.00"),
-			due_date=timezone.localdate(),
+			due_date=bs_today_date(),
 			items=[{"item": "Item A", "quantity": 1, "price": 1000}],
 		)
 
@@ -739,7 +739,7 @@ class CustomerDueCreditBehaviorTests(TestCase):
 			reverse("customer_allocate_payment", args=[self.customer.pk]),
 			data={
 				"allocation_mode": "credit",
-				"payment_date": timezone.localdate().isoformat(),
+				"payment_date": bs_today_date().isoformat(),
 				"sale_ids": [str(sale.id)],
 			},
 		)
@@ -767,7 +767,7 @@ class CustomerDueCreditBehaviorTests(TestCase):
 			reverse("customer_allocate_payment", args=[self.customer.pk]),
 			data={
 				"allocation_mode": "credit",
-				"payment_date": timezone.localdate().isoformat(),
+				"payment_date": bs_today_date().isoformat(),
 				"sale_ids": [str(sale.id)],
 			},
 		)
@@ -784,7 +784,7 @@ class CustomerDueCreditBehaviorTests(TestCase):
 			reverse("customer_allocate_payment", args=[self.customer.pk]),
 			data={
 				"allocation_mode": "credit",
-				"payment_date": timezone.localdate().isoformat(),
+				"payment_date": bs_today_date().isoformat(),
 				"sale_ids": [str(sale.id)],
 			},
 		)
@@ -801,7 +801,7 @@ class CustomerDueCreditBehaviorTests(TestCase):
 		# Actual new cash inflow (should count)
 		Transaction.objects.create(
 			customer=self.customer,
-			date=timezone.localdate(),
+			date=bs_today_date(),
 			amount=Decimal("200.00"),
 			type=TransactionType.INCOME,
 			category=payment_category,
@@ -812,7 +812,7 @@ class CustomerDueCreditBehaviorTests(TestCase):
 			reverse("customer_allocate_payment", args=[self.customer.pk]),
 			data={
 				"allocation_mode": "credit",
-				"payment_date": timezone.localdate().isoformat(),
+				"payment_date": bs_today_date().isoformat(),
 				"sale_ids": [str(sale.id)],
 			},
 		)
@@ -823,7 +823,7 @@ class CustomerDueCreditBehaviorTests(TestCase):
 
 	def test_unassigned_sale_appears_in_alerts_and_timeline(self):
 		self.client.login(username="alert-user", password="pass1234")
-		today = timezone.localdate()
+		today = bs_today_date()
 		unassigned_sale = Sale.objects.create(
 			invoice_number="INV-A-UNASSIGNED",
 			customer=None,
@@ -865,7 +865,7 @@ class TipperRecordsDescriptionTests(TestCase):
 		response = self.client.post(
 			reverse("tipper_record_create"),
 			data={
-				"date": timezone.localdate().isoformat(),
+				"date": bs_today_date().isoformat(),
 				"item": str(self.item.id),
 				"record_type": TipperRecordType.VALUE_ADDED,
 				"description": "Loaded soil from site A to site B.",
@@ -883,7 +883,7 @@ class TipperRecordsDescriptionTests(TestCase):
 		response = self.client.post(
 			reverse("tipper_record_create"),
 			data={
-				"date": timezone.localdate().isoformat(),
+				"date": bs_today_date().isoformat(),
 				"item": str(self.item.id),
 				"record_type": TipperRecordType.EXPENSE,
 				"description": "",
@@ -898,7 +898,7 @@ class TipperRecordsDescriptionTests(TestCase):
 	def test_edit_tipper_record_description(self):
 		self.client.login(username="tipper-user", password="pass1234")
 		record = TipperRecord.objects.create(
-			date=timezone.localdate(),
+			date=bs_today_date(),
 			item=self.item,
 			record_type=TipperRecordType.EXPENSE,
 			amount=Decimal("320.00"),
@@ -907,7 +907,7 @@ class TipperRecordsDescriptionTests(TestCase):
 		response = self.client.post(
 			reverse("tipper_record_edit", args=[record.pk]),
 			data={
-				"date": timezone.localdate().isoformat(),
+				"date": bs_today_date().isoformat(),
 				"item": str(self.item.id),
 				"record_type": TipperRecordType.EXPENSE,
 				"description": "Fuel refill for route 3.",
@@ -922,7 +922,7 @@ class TipperRecordsDescriptionTests(TestCase):
 	def test_tipper_list_search_matches_description(self):
 		self.client.login(username="tipper-user", password="pass1234")
 		TipperRecord.objects.create(
-			date=timezone.localdate(),
+			date=bs_today_date(),
 			item=self.item,
 			record_type=TipperRecordType.VALUE_ADDED,
 			description="Night shift haul",
@@ -936,7 +936,7 @@ class TipperRecordsDescriptionTests(TestCase):
 	def test_tipper_detail_and_list_show_placeholder_when_description_empty(self):
 		self.client.login(username="tipper-user", password="pass1234")
 		record = TipperRecord.objects.create(
-			date=timezone.localdate(),
+			date=bs_today_date(),
 			item=self.item,
 			record_type=TipperRecordType.EXPENSE,
 			amount=Decimal("100.00"),
@@ -964,7 +964,7 @@ class TipperExpenseLedgerSyncTests(TestCase):
 		response = self.client.post(
 			reverse("tipper_record_create"),
 			data={
-				"date": timezone.localdate().isoformat(),
+				"date": bs_today_date().isoformat(),
 				"item": str(self.item.id),
 				"record_type": TipperRecordType.EXPENSE,
 				"description": "Fuel refill",
@@ -985,7 +985,7 @@ class TipperExpenseLedgerSyncTests(TestCase):
 		response = self.client.post(
 			reverse("tipper_record_create"),
 			data={
-				"date": timezone.localdate().isoformat(),
+				"date": bs_today_date().isoformat(),
 				"item": str(self.item.id),
 				"record_type": TipperRecordType.VALUE_ADDED,
 				"description": "Backhaul income",
@@ -1000,7 +1000,7 @@ class TipperExpenseLedgerSyncTests(TestCase):
 	def test_edit_expense_to_value_added_removes_global_expense_transaction(self):
 		self.client.login(username="tipper-sync", password="pass1234")
 		record = TipperRecord.objects.create(
-			date=timezone.localdate(),
+			date=bs_today_date(),
 			item=self.item,
 			record_type=TipperRecordType.EXPENSE,
 			amount=Decimal("700.00"),
@@ -1009,7 +1009,7 @@ class TipperExpenseLedgerSyncTests(TestCase):
 		self.client.post(
 			reverse("tipper_record_edit", args=[record.pk]),
 			data={
-				"date": timezone.localdate().isoformat(),
+				"date": bs_today_date().isoformat(),
 				"item": str(self.item.id),
 				"record_type": TipperRecordType.EXPENSE,
 				"description": "Initial expense",
@@ -1021,7 +1021,7 @@ class TipperExpenseLedgerSyncTests(TestCase):
 		response = self.client.post(
 			reverse("tipper_record_edit", args=[record.pk]),
 			data={
-				"date": timezone.localdate().isoformat(),
+				"date": bs_today_date().isoformat(),
 				"item": str(self.item.id),
 				"record_type": TipperRecordType.VALUE_ADDED,
 				"description": "Converted to value add",
@@ -1040,7 +1040,7 @@ class TipperExpenseLedgerSyncTests(TestCase):
 		self.client.post(
 			reverse("tipper_record_create"),
 			data={
-				"date": timezone.localdate().isoformat(),
+				"date": bs_today_date().isoformat(),
 				"item": str(self.item.id),
 				"record_type": TipperRecordType.EXPENSE,
 				"description": "Fuel expense",
@@ -1050,7 +1050,7 @@ class TipperExpenseLedgerSyncTests(TestCase):
 		self.client.post(
 			reverse("tipper_record_create"),
 			data={
-				"date": timezone.localdate().isoformat(),
+				"date": bs_today_date().isoformat(),
 				"item": str(self.item.id),
 				"record_type": TipperRecordType.VALUE_ADDED,
 				"description": "Value add haul",
@@ -1072,7 +1072,7 @@ class JCBStatusFilterTests(TestCase):
 		self.client.login(username="jcb-filter", password="pass1234")
 
 		JCBRecord.objects.create(
-			date=timezone.localdate(),
+			date=bs_today_date(),
 			site_name="Work Site",
 			start_time=Decimal("600.00"),
 			end_time=Decimal("602.00"),
@@ -1081,7 +1081,7 @@ class JCBStatusFilterTests(TestCase):
 			total_amount=Decimal("4000.00"),
 		)
 		JCBRecord.objects.create(
-			date=timezone.localdate(),
+			date=bs_today_date(),
 			site_name="Fuel",
 			start_time=Decimal("0.00"),
 			end_time=Decimal("0.00"),
@@ -1107,7 +1107,7 @@ class BlocksInvestmentLedgerSyncTests(TestCase):
 		response = self.client.post(
 			reverse("blocks_record_create"),
 			data={
-				"date": timezone.localdate().isoformat(),
+				"date": bs_today_date().isoformat(),
 				"record_type": BlocksRecordType.INVESTMENT,
 				"investment": "1000.00",
 				"notes": "Cement and labor",
@@ -1130,7 +1130,7 @@ class BlocksInvestmentLedgerSyncTests(TestCase):
 		response = self.client.post(
 			reverse("blocks_record_create"),
 			data={
-				"date": timezone.localdate().isoformat(),
+				"date": bs_today_date().isoformat(),
 				"record_type": BlocksRecordType.SALE,
 				"unit_type": "4_inch",
 				"quantity": "10",
@@ -1151,12 +1151,12 @@ class BlocksInvestmentLedgerSyncTests(TestCase):
 	def test_delete_investment_record_does_not_delete_linked_expense_transaction(self):
 		self.client.login(username="blocks-sync", password="pass1234")
 		record = BlocksRecord.objects.create(
-			date=timezone.localdate(),
+			date=bs_today_date(),
 			record_type=BlocksRecordType.INVESTMENT,
 			investment=Decimal("500.00"),
 		)
 		expense_tx = Transaction.objects.create(
-			date=timezone.localdate(),
+			date=bs_today_date(),
 			amount=Decimal("500.00"),
 			type=TransactionType.EXPENSE,
 			blocks_record=record,
@@ -1180,7 +1180,7 @@ class CementInvestmentLedgerSyncTests(TestCase):
 		response = self.client.post(
 			reverse("cement_record_create"),
 			data={
-				"date": timezone.localdate().isoformat(),
+				"date": bs_today_date().isoformat(),
 				"record_type": CementRecordType.STOCK,
 				"unit_type": "4_inch",
 				"quantity": "10",
@@ -1198,7 +1198,7 @@ class CementInvestmentLedgerSyncTests(TestCase):
 		response = self.client.post(
 			reverse("cement_record_create"),
 			data={
-				"date": timezone.localdate().isoformat(),
+				"date": bs_today_date().isoformat(),
 				"record_type": CementRecordType.INVESTMENT,
 				"investment": "1000.00",
 				"notes": "Cement and labor",
@@ -1221,7 +1221,7 @@ class CementInvestmentLedgerSyncTests(TestCase):
 		response = self.client.post(
 			reverse("cement_record_create"),
 			data={
-				"date": timezone.localdate().isoformat(),
+				"date": bs_today_date().isoformat(),
 				"record_type": CementRecordType.SALE,
 				"unit_type": CementUnitType.PPC,
 				"quantity": "10",
@@ -1242,12 +1242,12 @@ class CementInvestmentLedgerSyncTests(TestCase):
 	def test_delete_investment_record_does_not_delete_linked_expense_transaction(self):
 		self.client.login(username="cement-sync", password="pass1234")
 		record = CementRecord.objects.create(
-			date=timezone.localdate(),
+			date=bs_today_date(),
 			record_type=CementRecordType.INVESTMENT,
 			investment=Decimal("500.00"),
 		)
 		expense_tx = Transaction.objects.create(
-			date=timezone.localdate(),
+			date=bs_today_date(),
 			amount=Decimal("500.00"),
 			type=TransactionType.EXPENSE,
 			cement_record=record,
@@ -1271,7 +1271,7 @@ class BambooInvestmentLedgerSyncTests(TestCase):
 		response = self.client.post(
 			reverse("bamboo_record_create"),
 			data={
-				"date": timezone.localdate().isoformat(),
+				"date": bs_today_date().isoformat(),
 				"record_type": BambooRecordType.INVESTMENT,
 				"investment": "1000.00",
 				"notes": "Bamboo purchase",
@@ -1294,7 +1294,7 @@ class BambooInvestmentLedgerSyncTests(TestCase):
 		response = self.client.post(
 			reverse("bamboo_record_create"),
 			data={
-				"date": timezone.localdate().isoformat(),
+				"date": bs_today_date().isoformat(),
 				"record_type": BambooRecordType.SALE,
 				"quantity": "10",
 				"price_per_unit": "100.00",
@@ -1314,12 +1314,12 @@ class BambooInvestmentLedgerSyncTests(TestCase):
 	def test_delete_investment_record_does_not_delete_linked_expense_transaction(self):
 		self.client.login(username="bamboo-sync", password="pass1234")
 		record = BambooRecord.objects.create(
-			date=timezone.localdate(),
+			date=bs_today_date(),
 			record_type=BambooRecordType.INVESTMENT,
 			investment=Decimal("500.00"),
 		)
 		expense_tx = Transaction.objects.create(
-			date=timezone.localdate(),
+			date=bs_today_date(),
 			amount=Decimal("500.00"),
 			type=TransactionType.EXPENSE,
 			bamboo_record=record,
@@ -1330,3 +1330,5 @@ class BambooInvestmentLedgerSyncTests(TestCase):
 		self.assertEqual(response.status_code, 302)
 		expense_tx.refresh_from_db()
 		self.assertIsNone(expense_tx.bamboo_record)
+
+

@@ -6,34 +6,35 @@
 <div class="space-y-6">
     <div class="cf-page-header">
         <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-            <h1 class="text-3xl font-extrabold tracking-tight">Dashboard</h1>
-            <p class="cf-page-subtitle">KPI overview, trends, and recent activity in one place.</p>
-        </div>
-        <form
-            class="grid grid-cols-1 sm:grid-cols-3 gap-2"
-            hx-get="{% url 'dashboard' %}"
-            hx-target="#dashboard-content"
-            hx-trigger="change delay:300ms, submit"
-            hx-indicator="#dashboard-loading"
-            hx-push-url="true"
-        >
-            <label class="form-control">
-                <span class="label-text text-xs">From</span>
-                <input type="date" name="date_from" value="{{ filters.date_from|default:'' }}" class="input input-bordered input-sm" aria-label="Filter from date" />
-            </label>
-            <label class="form-control">
-                <span class="label-text text-xs">To</span>
-                <input type="date" name="date_to" value="{{ filters.date_to|default:'' }}" class="input input-bordered input-sm" aria-label="Filter to date" />
-            </label>
-            <div class="flex items-end">
-                <div class="grid w-full grid-cols-2 gap-2">
-                    <button type="submit" class="btn btn-primary btn-sm">Apply</button>
-                    <a href="{% url 'dashboard' %}" class="btn btn-outline btn-sm">Reset</a>
-                </div>
+            <div>
+                <h1 class="text-3xl font-extrabold tracking-tight">Dashboard</h1>
+                <p class="cf-page-subtitle">KPI overview, trends, and recent activity in one place.</p>
             </div>
-        </form>
-    </div>
+            <form
+                id="dashboard-filter-form"
+                class="grid grid-cols-1 gap-2 sm:grid-cols-3"
+                hx-get="{% url 'dashboard' %}"
+                hx-target="#dashboard-content"
+                hx-trigger="change delay:300ms, submit"
+                hx-indicator="#dashboard-loading"
+                hx-push-url="true"
+            >
+                <label class="form-control">
+                    <span class="label-text text-xs">From</span>
+                    <input type="date" name="date_from" value="{{ filters.date_from|default:'' }}" class="input input-bordered input-sm" aria-label="Filter from date" />
+                </label>
+                <label class="form-control">
+                    <span class="label-text text-xs">To</span>
+                    <input type="date" name="date_to" value="{{ filters.date_to|default:'' }}" class="input input-bordered input-sm" aria-label="Filter to date" />
+                </label>
+                <div class="flex items-end">
+                    <div class="grid w-full grid-cols-2 gap-2">
+                        <button type="submit" class="btn btn-primary btn-sm">Apply</button>
+                        <a href="{% url 'dashboard' %}" class="btn btn-outline btn-sm">Reset</a>
+                    </div>
+                </div>
+            </form>
+        </div>
     </div>
 
     <div id="dashboard-loading" class="htmx-indicator">

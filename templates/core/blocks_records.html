@@ -10,11 +10,17 @@
                 <h1 class="text-3xl font-extrabold tracking-tight">Blocks Records</h1>
                 <p class="cf-page-subtitle">Manage inventory stock and track investment and sale records for block production.</p>
             </div>
-            <a href="{% url 'blocks_record_create' %}" class="btn btn-primary">Add Blocks Record</a>
+            <div class="cf-action-row">
+                {% if request.user.is_staff or request.user.is_superuser %}
+                <button type="button" class="btn btn-outline btn-sm cf-action-export-btn js-open-export-modal" data-export-report="blocks_records" data-export-title="Export Blocks Records" data-export-help="Download blocks records with the selected date range and filters." data-export-source-form="#blocks-filter-form">Export Report</button>
+                {% endif %}
+                <a href="{% url 'blocks_record_create' %}" class="btn btn-primary btn-sm cf-action-add-btn">Add Blocks Record</a>
+            </div>
         </div>
     </div>
 
     <form
+        id="blocks-filter-form"
         method="get"
         class="cf-filter-panel grid gap-3 md:grid-cols-2 lg:grid-cols-7"
         hx-get="{% url 'blocks_records' %}"

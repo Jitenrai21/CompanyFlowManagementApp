@@ -10,11 +10,17 @@
                 <h1 class="text-3xl font-extrabold tracking-tight">Cash Entries</h1>
                 <p class="cf-page-subtitle">Track and manage all incoming and outgoing cash records.</p>
             </div>
-            <a href="{% url 'transaction_create' %}" class="btn btn-primary">Add Entry</a>
+            <div class="cf-action-row">
+                {% if request.user.is_staff or request.user.is_superuser %}
+                <button type="button" class="btn btn-outline btn-sm cf-action-export-btn js-open-export-modal" data-export-report="cash_entries" data-export-title="Export Cash Entries" data-export-help="Download cash entries using the selected filters and date range." data-export-source-form="#cash-entries-filter-form">Export Report</button>
+                {% endif %}
+                <a href="{% url 'transaction_create' %}" class="btn btn-primary btn-sm cf-action-add-btn">Add Entry</a>
+            </div>
         </div>
     </div>
 
     <form
+        id="cash-entries-filter-form"
         method="get"
         class="cf-filter-panel grid gap-3 md:grid-cols-2 lg:grid-cols-8"
         hx-get="{% url 'cash_entries' %}"

@@ -10,11 +10,17 @@
                 <h1 class="text-3xl font-extrabold tracking-tight">Notifications and Timeline Alerts</h1>
                 <p class="cf-page-subtitle">Track auto and manual alerts for due tasks, invoices, and reminders.</p>
             </div>
-            <a href="{% url 'manual_alert_create' %}" class="btn btn-primary">New Alert</a>
+            <div class="cf-action-row">
+                {% if request.user.is_staff or request.user.is_superuser %}
+                <button type="button" class="btn btn-outline btn-sm cf-action-export-btn js-open-export-modal" data-export-report="alerts" data-export-title="Export Alerts Report" data-export-help="Download alert and notification records for the selected due-date range." data-export-source-form="#alerts-filter-form">Export Report</button>
+                {% endif %}
+                <a href="{% url 'manual_alert_create' %}" class="btn btn-primary btn-sm cf-action-add-btn">New Alert</a>
+            </div>
         </div>
     </div>
 
     <form
+        id="alerts-filter-form"
         method="get"
         class="cf-filter-panel grid gap-3 md:grid-cols-2 lg:grid-cols-4"
         hx-get="{% url 'alerts' %}"

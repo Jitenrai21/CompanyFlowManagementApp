@@ -10,11 +10,17 @@
                 <h1 class="text-3xl font-extrabold tracking-tight">JCB Records</h1>
                 <p class="cf-page-subtitle">Track work hours, settlement status, and occasional job expenses.</p>
             </div>
-            <a href="{% url 'jcb_record_create' %}" class="btn btn-primary">Add JCB Record</a>
+            <div class="cf-action-row">
+                {% if request.user.is_staff or request.user.is_superuser %}
+                <button type="button" class="btn btn-outline btn-sm cf-action-export-btn js-open-export-modal" data-export-report="jcb_records" data-export-title="Export JCB Records" data-export-help="Download JCB records using the selected filters and date range." data-export-source-form="#jcb-filter-form">Export Report</button>
+                {% endif %}
+                <a href="{% url 'jcb_record_create' %}" class="btn btn-primary btn-sm cf-action-add-btn">Add JCB Record</a>
+            </div>
         </div>
     </div>
 
     <form
+        id="jcb-filter-form"
         method="get"
         class="cf-filter-panel grid gap-3 md:grid-cols-2 lg:grid-cols-6"
         hx-get="{% url 'jcb_records' %}"

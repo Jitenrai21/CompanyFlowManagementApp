@@ -1,4 +1,5 @@
 import json
+import logging
 from decimal import Decimal
 from datetime import timedelta
 
@@ -51,6 +52,10 @@ from .models import (
 	TransactionCategory,
 	TransactionType,
 )
+from .report_exports import build_export_response
+
+
+logger = logging.getLogger(__name__)
 
 
 AUTO_SALE_INCOME_CATEGORY = "Sale Income (Auto)"
@@ -1072,6 +1077,29 @@ def dashboard(request):
 	if request.headers.get("HX-Request"):
 		return render(request, "core/partials/dashboard_content.html", context)
 	return render(request, "core/dashboard.html", context)
+
+
+@login_required
+def export_report(request):
+	if not (request.user.is_staff or request.user.is_superuser):
+		return HttpResponse(status=403)
+
+	report_name = request.GET.get("report", "").strip()
+	export_format = request.GET.get("format", "csv").strip().lower()
+
+	try:
+		response = build_export_response(report_name, export_format, request.GET)
+	except ValueError as error:
+		logger.warning("Export request rejected: %s (%s)", report_name, error)
+		return HttpResponse("Unsupported export request.", status=400)
+
+	logger.info(
+		"Exported report=%s format=%s user=%s",
+		report_name,
+		export_format,
+		request.user.get_username(),
+	)
+	return response
 
 
 @login_required

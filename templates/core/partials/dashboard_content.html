@@ -37,6 +37,38 @@
             </div>
         </div>
     </div>
+        {% if request.user.is_staff or request.user.is_superuser %}
+    <div class="cf-section">
+        <div class="cf-section-head flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+                <h2 class="font-semibold">Export Reports</h2>
+                <p class="text-sm text-base-content/60">Download dashboard summaries for the current date range.</p>
+            </div>
+            <div class="cf-action-row">
+                <button
+                    type="button"
+                    class="btn btn-outline btn-sm cf-action-export-btn js-open-export-modal"
+                    data-export-report="cash_flow"
+                    data-export-title="Export Cash Flow Report"
+                    data-export-help="Download daily cash flow between selected dates."
+                    data-export-source-form="#dashboard-filter-form"
+                >
+                    Export Cash Flow
+                </button>
+                <button
+                    type="button"
+                    class="btn btn-outline btn-sm cf-action-export-btn js-open-export-modal"
+                    data-export-report="product_performance"
+                    data-export-title="Export Product Performance"
+                    data-export-help="Download item-level product performance using the selected date range."
+                    data-export-source-form="#dashboard-filter-form"
+                >
+                    Export Product Performance
+                </button>
+            </div>
+        </div>
+    </div>
+    {% endif %}
 
     <div class="cf-section cf-mobile-hide-chart">
         <div class="card-body">

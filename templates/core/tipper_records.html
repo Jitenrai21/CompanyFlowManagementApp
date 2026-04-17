@@ -10,11 +10,17 @@
                 <h1 class="text-3xl font-extrabold tracking-tight">Tipper Records</h1>
                 <p class="cf-page-subtitle">Track tipper expense and value-added activity with quick filtering.</p>
             </div>
-            <a href="{% url 'tipper_record_create' %}" class="btn btn-primary">Add Tipper Record</a>
+            <div class="cf-action-row">
+                {% if request.user.is_staff or request.user.is_superuser %}
+                <button type="button" class="btn btn-outline btn-sm cf-action-export-btn js-open-export-modal" data-export-report="tipper_records" data-export-title="Export Tipper Records" data-export-help="Download tipper records using the selected filters and date range." data-export-source-form="#tipper-filter-form">Export Report</button>
+                {% endif %}
+                <a href="{% url 'tipper_record_create' %}" class="btn btn-primary btn-sm cf-action-add-btn">Add Tipper Record</a>
+            </div>
         </div>
     </div>
 
     <form
+        id="tipper-filter-form"
         method="get"
         class="cf-filter-panel grid gap-3 md:grid-cols-2 lg:grid-cols-7"
         hx-get="{% url 'tipper_records' %}"
