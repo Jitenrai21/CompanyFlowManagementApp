@@ -304,6 +304,7 @@ def _filtered_material_records(params, model, record_type_choices, unit_type_cho
     queryset = model.objects.all()
     query = (params.get("q", "") or "").strip()
     record_type = (params.get("record_type", "") or "").strip()
+    payment_status = (params.get("payment_status", "") or "").strip()
     date_from = _parse_date(params.get("date_from", "") or "")
     date_to = _parse_date(params.get("date_to", "") or "")
     sort = (params.get("sort", "-date") or "-date").strip()
@@ -313,6 +314,8 @@ def _filtered_material_records(params, model, record_type_choices, unit_type_cho
         queryset = queryset.filter(Q(notes__icontains=query) | Q(record_type__icontains=query))
     if record_type:
         queryset = queryset.filter(record_type=record_type)
+    if payment_status:
+        queryset = queryset.filter(payment_status=payment_status)
     if unit_type and unit_type_choices is not None:
         queryset = queryset.filter(unit_type=unit_type)
     if date_from:
@@ -331,6 +334,7 @@ def _filtered_material_records(params, model, record_type_choices, unit_type_cho
     return queryset.order_by(allowed_sorts.get(sort, "-date"), "-created_at"), {
         "q": query,
         "record_type": record_type,
+        "payment_status": payment_status,
         "unit_type": unit_type,
         "date_from": date_from,
         "date_to": date_to,
@@ -646,6 +650,7 @@ def _material_row_factory(queryset, include_unit_type=False):
                 record.date,
                 record.get_record_type_display(),
             ]
+            row.append(record.get_payment_status_display() if getattr(record, "payment_status", None) else "")
             if include_unit_type:
                 unit_display = record.get_unit_type_display() if getattr(record, "unit_type", None) else ""
                 row.append(unit_display)
@@ -663,13 +668,14 @@ def _material_row_factory(queryset, include_unit_type=False):
 
 def _build_material_definition(params, model, title, filename_slug, has_unit_type=False):
     queryset, filters = _filtered_material_records(params, model, None, unit_type_choices=True if has_unit_type else None)
-    headers = ["Date", "Record Type"]
+    headers = ["Date", "Record Type", "Payment Status"]
     if has_unit_type:
         headers.append("Unit Type")
     headers.extend(["Quantity", "Price Per Unit", "Investment", "Sale Income", "Notes"])
     summary = [
         f"Date range: {filters['date_from'].isoformat() if filters['date_from'] else 'all time'} to {filters['date_to'].isoformat() if filters['date_to'] else 'all time'}",
         f"Record type: {filters['record_type'] or 'all'}",
+        f"Payment status: {filters['payment_status'] or 'all'}",
     ]
     if has_unit_type:
         summary.append(f"Unit type: {filters['unit_type'] or 'all'}")

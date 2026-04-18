@@ -10,6 +10,7 @@
                 <tr>
                     <th>Date</th>
                     <th>Record Type</th>
+                    <th>Payment Status</th>
                     <th>Quantity</th>
                     <th>Investment</th>
                     <th>Sale Income</th>
@@ -37,6 +38,15 @@
                                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-3.5 w-3.5" aria-hidden="true"><path d="M4 4.5A2.5 2.5 0 016.5 2h7A2.5 2.5 0 0116 4.5v8a2.5 2.5 0 01-2.5 2.5h-7A2.5 2.5 0 014 12.5v-8zM6.5 4a.5.5 0 00-.5.5v8a.5.5 0 00.5.5h7a.5.5 0 00.5-.5v-8a.5.5 0 00-.5-.5h-7z" /><path d="M5.5 13.5a1 1 0 00-.93 1.366l1.5 3.75A1 1 0 007 19h6a1 1 0 00.93-.634l1.5-3.75a1 1 0 00-.93-1.366h-9z" /></svg>
                                 Stock
                             </div>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if record.record_type == 'sale' %}
+                            <span class="badge badge-sm {% if record.payment_status == 'paid' %}badge-success{% else %}badge-warning{% endif %} badge-outline whitespace-nowrap">
+                                {{ record.get_payment_status_display }}
+                            </span>
+                        {% else %}
+                            <span class="text-base-content/50">-</span>
                         {% endif %}
                     </td>
                     <td>{{ record.quantity|default:"-" }}</td>
@@ -67,6 +77,15 @@
                                 <a href="{% url 'bamboo_record_edit' record.id %}" class="btn btn-xs btn-square btn-outline" title="Edit record" aria-label="Edit bamboo record {{ record.id }}">
                                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-3.5 w-3.5" aria-hidden="true"><path d="M13.586 2.586a2 2 0 112.828 2.828l-8.9 8.9a1 1 0 01-.424.26l-3 1a1 1 0 01-1.264-1.264l1-3a1 1 0 01.26-.424l8.9-8.9z" /></svg>
                                 </a>
+                                {% if record.record_type == 'sale' and record.payment_status == 'pending' %}
+                                <form method="post" action="{% url 'bamboo_record_mark_paid' record.id %}" class="inline" onsubmit="return confirm('Mark this bamboo record as paid?');">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                    <button type="submit" class="btn btn-xs btn-square btn-success btn-outline" title="Mark paid" aria-label="Mark bamboo record {{ record.id }} as paid">
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-3.5 w-3.5" aria-hidden="true"><path fill-rule="evenodd" d="M16.704 5.29a1 1 0 010 1.42l-7.5 7.5a1 1 0 01-1.415.005l-3.5-3.4a1 1 0 011.394-1.434l2.793 2.714 6.803-6.805a1 1 0 011.425 0z" clip-rule="evenodd" /></svg>
+                                    </button>
+                                </form>
+                                {% endif %}
                                 <form method="post"
                                       action="{% url 'bamboo_record_delete' record.id %}"
                                       hx-post="{% url 'bamboo_record_delete' record.id %}"
@@ -86,6 +105,13 @@
                                 <div tabindex="0" class="dropdown-content z-[1] mt-2 w-44 rounded-box border border-base-300 bg-base-100 p-2 shadow">
                                     <div class="flex flex-col gap-1">
                                         <a href="{% url 'bamboo_record_edit' record.id %}" class="btn btn-xs btn-ghost justify-start">Edit</a>
+                                        {% if record.record_type == 'sale' and record.payment_status == 'pending' %}
+                                        <form method="post" action="{% url 'bamboo_record_mark_paid' record.id %}" onsubmit="return confirm('Mark this bamboo record as paid?');">
+                                            {% csrf_token %}
+                                            <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                            <button type="submit" class="btn btn-xs btn-success btn-outline w-full justify-start">Mark Paid</button>
+                                        </form>
+                                        {% endif %}
                                         <form method="post"
                                               action="{% url 'bamboo_record_delete' record.id %}"
                                               hx-post="{% url 'bamboo_record_delete' record.id %}"
@@ -103,7 +129,7 @@
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="7" class="text-center py-8">
+                    <td colspan="8" class="text-center py-8">
                         <div class="space-y-2">
                             <p class="text-base-content/70">No bamboo records found.</p>
                             <a href="{% url 'bamboo_record_create' %}" class="btn btn-sm btn-primary">Create First Record</a>
@@ -118,15 +144,15 @@
     {% if page_obj.has_other_pages %}
     <div class="cf-pagination">
         {% if page_obj.has_previous %}
-            <a href="?page=1{% if filters.q %}&q={{ filters.q|urlencode }}{% endif %}{% if filters.record_type %}&record_type={{ filters.record_type }}{% endif %}{% if filters.date_from %}&date_from={{ filters.date_from }}{% endif %}{% if filters.date_to %}&date_to={{ filters.date_to }}{% endif %}{% if filters.sort %}&sort={{ filters.sort }}{% endif %}" class="btn btn-sm btn-outline">First</a>
-            <a href="?page={{ page_obj.previous_page_number }}{% if filters.q %}&q={{ filters.q|urlencode }}{% endif %}{% if filters.record_type %}&record_type={{ filters.record_type }}{% endif %}{% if filters.date_from %}&date_from={{ filters.date_from }}{% endif %}{% if filters.date_to %}&date_to={{ filters.date_to }}{% endif %}{% if filters.sort %}&sort={{ filters.sort }}{% endif %}" class="btn btn-sm btn-outline">Previous</a>
+            <a href="?page=1{% if filters.q %}&q={{ filters.q|urlencode }}{% endif %}{% if filters.record_type %}&record_type={{ filters.record_type }}{% endif %}{% if filters.payment_status %}&payment_status={{ filters.payment_status }}{% endif %}{% if filters.date_from %}&date_from={{ filters.date_from }}{% endif %}{% if filters.date_to %}&date_to={{ filters.date_to }}{% endif %}{% if filters.sort %}&sort={{ filters.sort }}{% endif %}" class="btn btn-sm btn-outline">First</a>
+            <a href="?page={{ page_obj.previous_page_number }}{% if filters.q %}&q={{ filters.q|urlencode }}{% endif %}{% if filters.record_type %}&record_type={{ filters.record_type }}{% endif %}{% if filters.payment_status %}&payment_status={{ filters.payment_status }}{% endif %}{% if filters.date_from %}&date_from={{ filters.date_from }}{% endif %}{% if filters.date_to %}&date_to={{ filters.date_to }}{% endif %}{% if filters.sort %}&sort={{ filters.sort }}{% endif %}" class="btn btn-sm btn-outline">Previous</a>
         {% endif %}
 
         <span class="text-sm">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
 
         {% if page_obj.has_next %}
-            <a href="?page={{ page_obj.next_page_number }}{% if filters.q %}&q={{ filters.q|urlencode }}{% endif %}{% if filters.record_type %}&record_type={{ filters.record_type }}{% endif %}{% if filters.date_from %}&date_from={{ filters.date_from }}{% endif %}{% if filters.date_to %}&date_to={{ filters.date_to }}{% endif %}{% if filters.sort %}&sort={{ filters.sort }}{% endif %}" class="btn btn-sm btn-outline">Next</a>
-            <a href="?page={{ page_obj.paginator.num_pages }}{% if filters.q %}&q={{ filters.q|urlencode }}{% endif %}{% if filters.record_type %}&record_type={{ filters.record_type }}{% endif %}{% if filters.date_from %}&date_from={{ filters.date_from }}{% endif %}{% if filters.date_to %}&date_to={{ filters.date_to }}{% endif %}{% if filters.sort %}&sort={{ filters.sort }}{% endif %}" class="btn btn-sm btn-outline">Last</a>
+            <a href="?page={{ page_obj.next_page_number }}{% if filters.q %}&q={{ filters.q|urlencode }}{% endif %}{% if filters.record_type %}&record_type={{ filters.record_type }}{% endif %}{% if filters.payment_status %}&payment_status={{ filters.payment_status }}{% endif %}{% if filters.date_from %}&date_from={{ filters.date_from }}{% endif %}{% if filters.date_to %}&date_to={{ filters.date_to }}{% endif %}{% if filters.sort %}&sort={{ filters.sort }}{% endif %}" class="btn btn-sm btn-outline">Next</a>
+            <a href="?page={{ page_obj.paginator.num_pages }}{% if filters.q %}&q={{ filters.q|urlencode }}{% endif %}{% if filters.record_type %}&record_type={{ filters.record_type }}{% endif %}{% if filters.payment_status %}&payment_status={{ filters.payment_status }}{% endif %}{% if filters.date_from %}&date_from={{ filters.date_from }}{% endif %}{% if filters.date_to %}&date_to={{ filters.date_to }}{% endif %}{% if filters.sort %}&sort={{ filters.sort }}{% endif %}" class="btn btn-sm btn-outline">Last</a>
         {% endif %}
     </div>
     {% endif %}

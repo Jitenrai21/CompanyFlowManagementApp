@@ -103,6 +103,16 @@ body {
     padding-top: 0.25rem;
 }
 
+.cf-export-filter-note {
+    border: 1px solid rgba(74, 98, 138, 0.22);
+    border-radius: 0.75rem;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(238, 249, 249, 0.88));
+    padding: 0.7rem 0.85rem;
+    font-size: 0.8rem;
+    line-height: 1.45;
+    color: rgba(47, 70, 102, 0.86);
+}
+
 .cf-table-shell {
     border: 1px solid rgba(74, 98, 138, 0.14);
     border-radius: 1rem;

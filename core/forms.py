@@ -26,7 +26,7 @@ def _decorate_widget(field_name, field):
         return
     if field_name in {"description", "profile_notes", "address", "items"}:
         field.widget.attrs["class"] = f"textarea textarea-bordered w-full {existing_class}".strip()
-    elif field_name in {"type", "payment_method", "customer", "status", "sale", "category", "alert_type"}:
+    elif field_name in {"type", "payment_method", "customer", "status", "sale", "category", "alert_type", "payment_status"}:
         field.widget.attrs["class"] = f"select select-bordered w-full {existing_class}".strip()
     elif field_name == "attachment":
         field.widget.attrs["class"] = f"file-input file-input-bordered w-full {existing_class}".strip()
@@ -526,6 +526,7 @@ class BlocksRecordForm(forms.ModelForm):
         fields = [
             "date",
             "record_type",
+            "payment_status",
             "investment",
             "unit_type",
             "quantity",
@@ -545,10 +546,16 @@ class BlocksRecordForm(forms.ModelForm):
     def clean(self):
         cleaned_data = super().clean()
         record_type = cleaned_data.get("record_type")
+        payment_status = cleaned_data.get("payment_status")
         investment = cleaned_data.get("investment")
         quantity = cleaned_data.get("quantity")
         unit_type = cleaned_data.get("unit_type")
         price_per_unit = cleaned_data.get("price_per_unit")
+
+        if record_type == BlocksRecordType.SALE:
+            cleaned_data["payment_status"] = payment_status or RecordStatus.PENDING
+        else:
+            cleaned_data["payment_status"] = None
         
         if record_type == BlocksRecordType.INVESTMENT:
             # For INVESTMENT records, investment must be provided
@@ -579,6 +586,11 @@ class BlocksRecordForm(forms.ModelForm):
         self.fields["sale_income"].disabled = True
         self.fields["sale_income"].label = "Sale Income"
         self.fields["sale_income"].help_text = "Auto-calculated from quantity × price"
+        self.fields["payment_status"].required = False
+        self.fields["payment_status"].label = "Payment Status"
+        self.fields["payment_status"].help_text = "Sale records only"
+        if not self.is_bound and not self.instance.pk:
+            self.fields["payment_status"].initial = RecordStatus.PENDING
         self.fields["investment"].required = False
         self.fields["quantity"].required = False
         self.fields["unit_type"].required = False
@@ -597,6 +609,7 @@ class CementRecordForm(forms.ModelForm):
         fields = [
             "date",
             "record_type",
+            "payment_status",
             "investment",
             "unit_type",
             "quantity",
@@ -616,10 +629,16 @@ class CementRecordForm(forms.ModelForm):
     def clean(self):
         cleaned_data = super().clean()
         record_type = cleaned_data.get("record_type")
+        payment_status = cleaned_data.get("payment_status")
         investment = cleaned_data.get("investment")
         quantity = cleaned_data.get("quantity")
         unit_type = cleaned_data.get("unit_type")
         price_per_unit = cleaned_data.get("price_per_unit")
+
+        if record_type == CementRecordType.SALE:
+            cleaned_data["payment_status"] = payment_status or RecordStatus.PENDING
+        else:
+            cleaned_data["payment_status"] = None
 
         if record_type == CementRecordType.INVESTMENT:
             if investment is None or investment <= 0:
@@ -645,6 +664,11 @@ class CementRecordForm(forms.ModelForm):
         self.fields["sale_income"].disabled = True
         self.fields["sale_income"].label = "Sale Income"
         self.fields["sale_income"].help_text = "Auto-calculated from quantity × price"
+        self.fields["payment_status"].required = False
+        self.fields["payment_status"].label = "Payment Status"
+        self.fields["payment_status"].help_text = "Sale records only"
+        if not self.is_bound and not self.instance.pk:
+            self.fields["payment_status"].initial = RecordStatus.PENDING
         self.fields["investment"].required = False
         self.fields["quantity"].required = False
         self.fields["unit_type"].required = False
@@ -663,6 +687,7 @@ class BambooRecordForm(forms.ModelForm):
         fields = [
             "date",
             "record_type",
+            "payment_status",
             "investment",
             "quantity",
             "price_per_unit",
@@ -681,9 +706,15 @@ class BambooRecordForm(forms.ModelForm):
     def clean(self):
         cleaned_data = super().clean()
         record_type = cleaned_data.get("record_type")
+        payment_status = cleaned_data.get("payment_status")
         investment = cleaned_data.get("investment")
         quantity = cleaned_data.get("quantity")
         price_per_unit = cleaned_data.get("price_per_unit")
+
+        if record_type == BambooRecordType.SALE:
+            cleaned_data["payment_status"] = payment_status or RecordStatus.PENDING
+        else:
+            cleaned_data["payment_status"] = None
 
         if record_type == BambooRecordType.INVESTMENT:
             if investment is None or investment <= 0:
@@ -705,6 +736,11 @@ class BambooRecordForm(forms.ModelForm):
         self.fields["sale_income"].disabled = True
         self.fields["sale_income"].label = "Sale Income"
         self.fields["sale_income"].help_text = "Auto-calculated from quantity × price"
+        self.fields["payment_status"].required = False
+        self.fields["payment_status"].label = "Payment Status"
+        self.fields["payment_status"].help_text = "Sale records only"
+        if not self.is_bound and not self.instance.pk:
+            self.fields["payment_status"].initial = RecordStatus.PENDING
         self.fields["investment"].required = False
         self.fields["quantity"].required = False
         self.fields["price_per_unit"].required = False

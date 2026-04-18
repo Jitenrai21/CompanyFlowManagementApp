@@ -179,17 +179,18 @@ class BlocksRecordAdmin(admin.ModelAdmin):
     list_display = (
         "date",
         "record_type",
+        "payment_status",
         "unit_type",
         "quantity",
         "investment",
         "sale_income",
     )
-    list_filter = ("record_type", "unit_type", "date")
+    list_filter = ("record_type", "payment_status", "unit_type", "date")
     search_fields = ("notes",)
     date_hierarchy = "date"
     ordering = ("-date", "-created_at")
     fieldsets = (
-        ("Record Information", {"fields": ("date", "record_type", "notes")}),
+        ("Record Information", {"fields": ("date", "record_type", "payment_status", "notes")}),
         ("Financial Fields", {"fields": ("investment", "sale_income")}),
         ("Stock Fields", {"fields": ("unit_type", "quantity", "price_per_unit")}),
     )
@@ -200,17 +201,18 @@ class CementRecordAdmin(admin.ModelAdmin):
     list_display = (
         "date",
         "record_type",
+        "payment_status",
         "unit_type",
         "quantity",
         "investment",
         "sale_income",
     )
-    list_filter = ("record_type", "unit_type", "date")
+    list_filter = ("record_type", "payment_status", "unit_type", "date")
     search_fields = ("notes",)
     date_hierarchy = "date"
     ordering = ("-date", "-created_at")
     fieldsets = (
-        ("Record Information", {"fields": ("date", "record_type", "notes")}),
+        ("Record Information", {"fields": ("date", "record_type", "payment_status", "notes")}),
         ("Financial Fields", {"fields": ("investment", "sale_income")}),
         ("Stock Fields", {"fields": ("unit_type", "quantity", "price_per_unit")}),
     )
@@ -221,16 +223,17 @@ class BambooRecordAdmin(admin.ModelAdmin):
     list_display = (
         "date",
         "record_type",
+        "payment_status",
         "quantity",
         "investment",
         "sale_income",
     )
-    list_filter = ("record_type", "date")
+    list_filter = ("record_type", "payment_status", "date")
     search_fields = ("notes",)
     date_hierarchy = "date"
     ordering = ("-date", "-created_at")
     fieldsets = (
-        ("Record Information", {"fields": ("date", "record_type", "notes")}),
+        ("Record Information", {"fields": ("date", "record_type", "payment_status", "notes")}),
         ("Financial Fields", {"fields": ("investment", "sale_income")}),
         ("Stock Fields", {"fields": ("quantity", "price_per_unit")}),
     )

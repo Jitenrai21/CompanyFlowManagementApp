@@ -78,6 +78,12 @@
                     {% if form.sale_income.errors %}<p class="text-error text-sm mt-1">{{ form.sale_income.errors|join:', ' }}</p>{% endif %}
                     <p class="text-xs text-base-content/60 mt-1">{{ form.sale_income.help_text }}</p>
                 </div>
+                <div id="payment-status-field" class="form-control hidden">
+                    <label class="label" for="id_payment_status"><span class="label-text">Payment Status</span></label>
+                    {{ form.payment_status }}
+                    {% if form.payment_status.errors %}<p class="text-error text-sm mt-1">{{ form.payment_status.errors|join:', ' }}</p>{% endif %}
+                    <p class="text-xs text-base-content/60 mt-1">Shown for sale records only.</p>
+                </div>
             </div>
         </div>
 
@@ -96,12 +102,26 @@
 </div>
 
 <script>
-    document.getElementById('id_record_type').addEventListener('change', function() {
-        const recordType = this.value;
-        document.querySelectorAll('[data-record-type]').forEach(el => {
-            el.style.display = el.dataset.recordType.includes(recordType) ? 'block' : 'none';
-        });
-    });
+    const recordTypeInput = document.getElementById('id_record_type');
+    const paymentStatusField = document.getElementById('payment-status-field');
+    const paymentStatusInput = document.getElementById('id_payment_status');
+
+    function togglePaymentStatusField() {
+        if (!recordTypeInput || !paymentStatusField || !paymentStatusInput) {
+            return;
+        }
+        const isSale = recordTypeInput.value === 'sale';
+        paymentStatusField.classList.toggle('hidden', !isSale);
+        if (isSale && !paymentStatusInput.value) {
+            paymentStatusInput.value = 'pending';
+        }
+        if (!isSale) {
+            paymentStatusInput.value = '';
+        }
+    }
+
+    recordTypeInput.addEventListener('change', togglePaymentStatusField);
+    togglePaymentStatusField();
 
     document.getElementById('id_quantity').addEventListener('input', calculateIncome);
     document.getElementById('id_price_per_unit').addEventListener('input', calculateIncome);

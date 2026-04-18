@@ -469,7 +469,16 @@ def _dashboard_context(date_from="", date_to=""):
 	# Blocks Records Summary
 	blocks_summary_raw = blocks_queryset.aggregate(
 		total_investment=Coalesce(Sum("investment"), Value(Decimal("0.00"))),
-		total_sale_income=Coalesce(Sum("sale_income"), Value(Decimal("0.00"))),
+		total_sale_income=Coalesce(
+			Sum(
+				"sale_income",
+				filter=Q(
+					record_type=BlocksRecordType.SALE,
+					payment_status=RecordStatus.PAID,
+				),
+			),
+			Value(Decimal("0.00")),
+		),
 	)
 	blocks_summary = {
 		"total_investment": blocks_summary_raw["total_investment"],
@@ -522,7 +531,16 @@ def _dashboard_context(date_from="", date_to=""):
 	# Cement Records Summary
 	cement_summary_raw = cement_queryset.aggregate(
 		total_investment=Coalesce(Sum("investment"), Value(Decimal("0.00"))),
-		total_sale_income=Coalesce(Sum("sale_income"), Value(Decimal("0.00"))),
+		total_sale_income=Coalesce(
+			Sum(
+				"sale_income",
+				filter=Q(
+					record_type=CementRecordType.SALE,
+					payment_status=RecordStatus.PAID,
+				),
+			),
+			Value(Decimal("0.00")),
+		),
 	)
 	cement_summary = {
 		"total_investment": cement_summary_raw["total_investment"],
@@ -566,7 +584,16 @@ def _dashboard_context(date_from="", date_to=""):
 	# Bamboo Records Summary
 	bamboo_summary_raw = bamboo_queryset.aggregate(
 		total_investment=Coalesce(Sum("investment"), Value(Decimal("0.00"))),
-		total_sale_income=Coalesce(Sum("sale_income"), Value(Decimal("0.00"))),
+		total_sale_income=Coalesce(
+			Sum(
+				"sale_income",
+				filter=Q(
+					record_type=BambooRecordType.SALE,
+					payment_status=RecordStatus.PAID,
+				),
+			),
+			Value(Decimal("0.00")),
+		),
 	)
 	bamboo_summary = {
 		"total_investment": bamboo_summary_raw["total_investment"],
@@ -2377,6 +2404,7 @@ def blocks_records(request):
 
 	query = request.GET.get("q", "").strip()
 	record_type = request.GET.get("record_type", "").strip()
+	payment_status = request.GET.get("payment_status", "").strip()
 	unit_type = request.GET.get("unit_type", "").strip()
 	date_from = request.GET.get("date_from", "").strip() or default_from
 	date_to = request.GET.get("date_to", "").strip() or default_to
@@ -2388,6 +2416,8 @@ def blocks_records(request):
 		)
 	if record_type:
 		queryset = queryset.filter(record_type=record_type)
+	if payment_status:
+		queryset = queryset.filter(payment_status=payment_status)
 	if unit_type:
 		queryset = queryset.filter(unit_type=unit_type)
 	if date_from:
@@ -2414,12 +2444,14 @@ def blocks_records(request):
 		"filters": {
 			"q": query,
 			"record_type": record_type,
+			"payment_status": payment_status,
 			"unit_type": unit_type,
 			"date_from": date_from,
 			"date_to": date_to,
 			"sort": sort,
 		},
 		"record_type_choices": BlocksRecordType.choices,
+		"payment_status_choices": RecordStatus.choices,
 		"unit_type_choices": BlocksUnitType.choices,
 	}
 
@@ -2505,6 +2537,28 @@ def blocks_record_delete(request, pk):
 	return redirect("blocks_records")
 
 
+@login_required
+def blocks_record_mark_paid(request, pk):
+	"""Mark a pending blocks sale record as paid."""
+	blocks_record = get_object_or_404(BlocksRecord, pk=pk)
+
+	if request.method != "POST":
+		return _redirect_to_next_or_default(request, "blocks_records")
+
+	if blocks_record.record_type != BlocksRecordType.SALE:
+		messages.error(request, "Only sale records can be marked as paid.")
+		return _redirect_to_next_or_default(request, "blocks_records")
+
+	if blocks_record.payment_status == RecordStatus.PAID:
+		messages.info(request, "Blocks record is already marked as paid.")
+		return _redirect_to_next_or_default(request, "blocks_records")
+
+	blocks_record.payment_status = RecordStatus.PAID
+	blocks_record.save(update_fields=["payment_status", "updated_at"])
+	messages.success(request, f"Blocks sale record on {blocks_record.date} marked as paid.")
+	return _redirect_to_next_or_default(request, "blocks_records")
+
+
 def _create_blocks_sale_transaction(blocks_record):
 	"""Create transaction entries for blocks sale records."""
 	BLOCKS_SALE_INCOME_CATEGORY = "Blocks Sale Income"
@@ -2531,6 +2585,7 @@ def cement_records(request):
 
 	query = request.GET.get("q", "").strip()
 	record_type = request.GET.get("record_type", "").strip()
+	payment_status = request.GET.get("payment_status", "").strip()
 	unit_type = request.GET.get("unit_type", "").strip()
 	date_from = request.GET.get("date_from", "").strip() or default_from
 	date_to = request.GET.get("date_to", "").strip() or default_to
@@ -2540,6 +2595,8 @@ def cement_records(request):
 		queryset = queryset.filter(Q(notes__icontains=query) | Q(record_type__icontains=query))
 	if record_type:
 		queryset = queryset.filter(record_type=record_type)
+	if payment_status:
+		queryset = queryset.filter(payment_status=payment_status)
 	if unit_type:
 		queryset = queryset.filter(unit_type=unit_type)
 	if date_from:
@@ -2566,12 +2623,14 @@ def cement_records(request):
 		"filters": {
 			"q": query,
 			"record_type": record_type,
+			"payment_status": payment_status,
 			"unit_type": unit_type,
 			"date_from": date_from,
 			"date_to": date_to,
 			"sort": sort,
 		},
 		"record_type_choices": CementRecordType.choices,
+		"payment_status_choices": RecordStatus.choices,
 		"unit_type_choices": CementUnitType.choices,
 	}
 
@@ -2650,6 +2709,28 @@ def cement_record_delete(request, pk):
 	return redirect("cement_records")
 
 
+@login_required
+def cement_record_mark_paid(request, pk):
+	"""Mark a pending cement sale record as paid."""
+	cement_record = get_object_or_404(CementRecord, pk=pk)
+
+	if request.method != "POST":
+		return _redirect_to_next_or_default(request, "cement_records")
+
+	if cement_record.record_type != CementRecordType.SALE:
+		messages.error(request, "Only sale records can be marked as paid.")
+		return _redirect_to_next_or_default(request, "cement_records")
+
+	if cement_record.payment_status == RecordStatus.PAID:
+		messages.info(request, "Cement record is already marked as paid.")
+		return _redirect_to_next_or_default(request, "cement_records")
+
+	cement_record.payment_status = RecordStatus.PAID
+	cement_record.save(update_fields=["payment_status", "updated_at"])
+	messages.success(request, f"Cement sale record on {cement_record.date} marked as paid.")
+	return _redirect_to_next_or_default(request, "cement_records")
+
+
 def _create_cement_sale_transaction(cement_record):
 	"""Create transaction entries for cement sale records."""
 	CEMENT_SALE_INCOME_CATEGORY = "Cement Sale Income"
@@ -2676,6 +2757,7 @@ def bamboo_records(request):
 
 	query = request.GET.get("q", "").strip()
 	record_type = request.GET.get("record_type", "").strip()
+	payment_status = request.GET.get("payment_status", "").strip()
 	date_from = request.GET.get("date_from", "").strip() or default_from
 	date_to = request.GET.get("date_to", "").strip() or default_to
 	sort = request.GET.get("sort", "-date")
@@ -2684,6 +2766,8 @@ def bamboo_records(request):
 		queryset = queryset.filter(Q(notes__icontains=query) | Q(record_type__icontains=query))
 	if record_type:
 		queryset = queryset.filter(record_type=record_type)
+	if payment_status:
+		queryset = queryset.filter(payment_status=payment_status)
 	if date_from:
 		queryset = queryset.filter(date__gte=date_from)
 	if date_to:
@@ -2708,11 +2792,13 @@ def bamboo_records(request):
 		"filters": {
 			"q": query,
 			"record_type": record_type,
+			"payment_status": payment_status,
 			"date_from": date_from,
 			"date_to": date_to,
 			"sort": sort,
 		},
 		"record_type_choices": BambooRecordType.choices,
+		"payment_status_choices": RecordStatus.choices,
 	}
 
 	if request.headers.get("HX-Request"):
@@ -2788,6 +2874,28 @@ def bamboo_record_delete(request, pk):
 	bamboo_record.delete()
 	messages.success(request, "Bamboo record deleted successfully.")
 	return redirect("bamboo_records")
+
+
+@login_required
+def bamboo_record_mark_paid(request, pk):
+	"""Mark a pending bamboo sale record as paid."""
+	bamboo_record = get_object_or_404(BambooRecord, pk=pk)
+
+	if request.method != "POST":
+		return _redirect_to_next_or_default(request, "bamboo_records")
+
+	if bamboo_record.record_type != BambooRecordType.SALE:
+		messages.error(request, "Only sale records can be marked as paid.")
+		return _redirect_to_next_or_default(request, "bamboo_records")
+
+	if bamboo_record.payment_status == RecordStatus.PAID:
+		messages.info(request, "Bamboo record is already marked as paid.")
+		return _redirect_to_next_or_default(request, "bamboo_records")
+
+	bamboo_record.payment_status = RecordStatus.PAID
+	bamboo_record.save(update_fields=["payment_status", "updated_at"])
+	messages.success(request, f"Bamboo sale record on {bamboo_record.date} marked as paid.")
+	return _redirect_to_next_or_default(request, "bamboo_records")
 
 
 def _create_bamboo_sale_transaction(bamboo_record):

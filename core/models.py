@@ -432,6 +432,14 @@ class BlocksRecord(TimeStampedModel):
         choices=BlocksRecordType.choices,
         help_text="Type of record: investment, stock inventory update, or sale"
     )
+    payment_status = models.CharField(
+        max_length=10,
+        choices=RecordStatus.choices,
+        default=RecordStatus.PENDING,
+        blank=True,
+        null=True,
+        help_text="Payment status for sale records only",
+    )
     
     # Investment fields (for INVESTMENT and SALE record types)
     investment = models.DecimalField(
@@ -486,6 +494,11 @@ class BlocksRecord(TimeStampedModel):
     def save(self, *args, **kwargs):
         """Auto-calculate sale_income for SALE records and validate fields."""
         if self.record_type == BlocksRecordType.SALE:
+            if not self.payment_status:
+                self.payment_status = RecordStatus.PENDING
+        else:
+            self.payment_status = None
+        if self.record_type == BlocksRecordType.SALE:
             if self.quantity and self.price_per_unit:
                 quantity_decimal = Decimal(str(self.quantity))
                 price_decimal = Decimal(str(self.price_per_unit))
@@ -534,6 +547,14 @@ class CementRecord(TimeStampedModel):
         max_length=20,
         choices=CementRecordType.choices,
         help_text="Type of record: investment, stock inventory update, or sale",
+    )
+    payment_status = models.CharField(
+        max_length=10,
+        choices=RecordStatus.choices,
+        default=RecordStatus.PENDING,
+        blank=True,
+        null=True,
+        help_text="Payment status for sale records only",
     )
 
     investment = models.DecimalField(
@@ -587,6 +608,11 @@ class CementRecord(TimeStampedModel):
     def save(self, *args, **kwargs):
         """Auto-calculate sale_income for SALE records and validate fields."""
         if self.record_type == CementRecordType.SALE:
+            if not self.payment_status:
+                self.payment_status = RecordStatus.PENDING
+        else:
+            self.payment_status = None
+        if self.record_type == CementRecordType.SALE:
             if self.quantity and self.price_per_unit:
                 quantity_decimal = Decimal(str(self.quantity))
                 price_decimal = Decimal(str(self.price_per_unit))
@@ -626,6 +652,14 @@ class BambooRecord(TimeStampedModel):
         max_length=20,
         choices=BambooRecordType.choices,
         help_text="Type of record: investment, stock inventory update, or sale",
+    )
+    payment_status = models.CharField(
+        max_length=10,
+        choices=RecordStatus.choices,
+        default=RecordStatus.PENDING,
+        blank=True,
+        null=True,
+        help_text="Payment status for sale records only",
     )
 
     investment = models.DecimalField(
@@ -670,6 +704,11 @@ class BambooRecord(TimeStampedModel):
 
     def save(self, *args, **kwargs):
         """Auto-calculate sale_income for SALE records and validate fields."""
+        if self.record_type == BambooRecordType.SALE:
+            if not self.payment_status:
+                self.payment_status = RecordStatus.PENDING
+        else:
+            self.payment_status = None
         if self.record_type == BambooRecordType.SALE:
             if self.quantity and self.price_per_unit:
                 quantity_decimal = Decimal(str(self.quantity))
