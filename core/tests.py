@@ -6,7 +6,8 @@ from django.contrib.auth import get_user_model
 from django.core.management import call_command
 from django.test import TestCase
 from django.urls import reverse
-from django.utils import timezone\n\nfrom .bs_dates import bs_add_days, bs_today_date
+from django.utils import timezone
+from bs_dates import bs_add_days, bs_today_date
 
 from .forms import SaleForm
 from .models import (

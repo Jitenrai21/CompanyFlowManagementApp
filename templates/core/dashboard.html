@@ -73,6 +73,7 @@
     let dashboardCharts = {
         salesTrend: null,
         incomeExpense: null,
+        topPendingCustomers: null,
         topCustomers: null,
         jcbSummary: null,
         tipperSummary: null,
@@ -231,13 +232,15 @@
             if (dashboardCharts[key]) {
                 if (typeof dashboardCharts[key].dispose === 'function') {
                     dashboardCharts[key].dispose();
+                } else if (typeof dashboardCharts[key].destroy === 'function') {
+                    dashboardCharts[key].destroy();
                 }
                 dashboardCharts[key] = null;
             }
         });
     }
 
-    function attachBarKeyboardNavigation(chart, element, labels, values) {
+    function attachBarKeyboardNavigation(chart, element, labels, values, metricLabel = 'Sales') {
         if (!chart || !element || !Array.isArray(labels) || !labels.length) {
             return;
         }
@@ -257,7 +260,7 @@
             });
 
             const amount = formatNpr(values[activeIndex]);
-            element.setAttribute('aria-label', `Top customers by sales chart. ${labels[activeIndex]} with ${amount}.`);
+            element.setAttribute('aria-label', `Top customers by ${metricLabel.toLowerCase()} chart. ${labels[activeIndex]} with ${amount}.`);
         }
 
         element.addEventListener('focus', () => {
@@ -287,12 +290,12 @@
         });
     }
 
-    function sanitizeTopCustomers(labels, values) {
+    function sanitizeTopCustomers(labels, values, limit = 8) {
         const pairs = (labels || []).map((label, index) => ({
             label,
             value: numberFrom(values[index])
         }));
-        return pairs.filter((item) => item.label && item.value > 0).sort((a, b) => b.value - a.value).slice(0, 8);
+        return pairs.filter((item) => item.label && item.value > 0).sort((a, b) => b.value - a.value).slice(0, limit);
     }
 
     function buildSortedCategoryData(labels, values, limit = 10) {
@@ -392,6 +395,8 @@
         const incomeExpenseValues = cleanSeries(readJsonScript('income-expense-values'));
         const jcbSummaryLabels = readJsonScript('jcb-summary-labels');
         const jcbSummaryValues = cleanSeries(readJsonScript('jcb-summary-values'));
+        const topPendingCustomerLabels = readJsonScript('top-pending-customer-labels');
+        const topPendingCustomerValues = cleanSeries(readJsonScript('top-pending-customer-values'));
         const topCustomerLabels = readJsonScript('top-customer-labels');
         const topCustomerValues = cleanSeries(readJsonScript('top-customer-values'));
         const categoryExpenseLabels = readJsonScript('category-expense-labels');
@@ -410,6 +415,7 @@
         const trendCanvas = document.getElementById('sales-trend-chart');
         const pieCanvas = document.getElementById('income-expense-chart');
         const jcbSummaryCanvas = document.getElementById('jcb-summary-chart');
+        const topPendingCanvas = document.getElementById('top-pending-customers-chart');
         const topCanvas = document.getElementById('top-customers-chart');
         const categoryExpenseCanvas = document.getElementById('category-expense-chart');
         const categoryIncomeCanvas = document.getElementById('category-income-chart');
@@ -570,12 +576,99 @@
             registerChart('incomeExpense', barChart, pieCanvas);
         }
 
+        if (!compactViewport && topPendingCanvas && topPendingCustomerLabels && topPendingCustomerValues) {
+            const rankedPending = sanitizeTopCustomers(topPendingCustomerLabels, topPendingCustomerValues, 10);
+            const labels = rankedPending.map((item) => item.label);
+            const values = rankedPending.map((item) => item.value);
+            const total = values.reduce((sum, value) => sum + value, 0);
+            const pendingCustomerPalette = ['#1D70B8', '#3BA99C', '#E09F3E', '#E36464', '#7A7EE6', '#3E5C76', '#6CC4A1', '#2C6693', '#355E8A', '#52796F'];
+            const pendingBarMaxWidth = labels.length > 8 ? 14 : 18;
+            const pendingBarCategoryGap = labels.length > 8 ? '58%' : '44%';
+
+            const topPendingChart = echarts.init(topPendingCanvas, null, { renderer: 'canvas' });
+            topPendingChart.setOption({
+                animationDuration: 960,
+                legend: {
+                    top: 0,
+                    left: 'left',
+                    itemHeight: 10,
+                    icon: 'roundRect',
+                    textStyle: { color: '#31445F' },
+                    data: ['Pending Amount']
+                },
+                grid: { left: 112, right: 24, top: 42, bottom: 36, containLabel: true },
+                xAxis: {
+                    type: 'value',
+                    splitNumber: 4,
+                    name: 'Pending Amount (NPR)',
+                    nameLocation: 'middle',
+                    nameGap: 28,
+                    nameTextStyle: { color: '#516178', fontWeight: 600 },
+                    axisLabel: {
+                        color: '#516178',
+                        hideOverlap: true,
+                        margin: 10,
+                        formatter: (value) => formatCompactAxisValue(value)
+                    },
+                    splitLine: { lineStyle: { color: 'rgba(80, 110, 150, 0.12)' } }
+                },
+                yAxis: {
+                    type: 'category',
+                    inverse: true,
+                    data: labels,
+                    axisLabel: {
+                        color: '#31445F',
+                        width: 102,
+                        overflow: 'truncate'
+                    },
+                    axisTick: { show: false },
+                    axisLine: { show: false }
+                },
+                tooltip: {
+                    trigger: 'item',
+                    backgroundColor: 'rgba(15, 23, 42, 0.94)',
+                    borderWidth: 0,
+                    textStyle: { color: '#F8FAFC' },
+                    formatter(param) {
+                        const value = numberFrom(param.value);
+                        const pct = total > 0 ? ((value / total) * 100).toFixed(1) : '0.0';
+                        return `${param.name}<br/>Pending: ${formatNpr(value)}<br/>Contribution: ${pct}%`;
+                    }
+                },
+                series: [{
+                    name: 'Pending Amount',
+                    type: 'bar',
+                    data: values.map((value, index) => ({
+                        value,
+                        itemStyle: {
+                            borderRadius: [0, 10, 10, 0],
+                            color: pendingCustomerPalette[index % pendingCustomerPalette.length]
+                        }
+                    })),
+                    barMinHeight: 6,
+                    barMaxWidth: pendingBarMaxWidth,
+                    barCategoryGap: pendingBarCategoryGap,
+                    label: {
+                        show: true,
+                        position: 'right',
+                        color: '#31445F',
+                        formatter: ({ value }) => formatCompactAxisValue(value)
+                    },
+                    emphasis: { focus: 'series' }
+                }]
+            });
+            registerChart('topPendingCustomers', topPendingChart, topPendingCanvas);
+            attachBarKeyboardNavigation(topPendingChart, topPendingCanvas, labels, values, 'Pending Amount');
+        }
+
         if (!compactViewport && topCanvas && topCustomerLabels && topCustomerValues) {
-            const ranked = sanitizeTopCustomers(topCustomerLabels, topCustomerValues);
+            const ranked = sanitizeTopCustomers(topCustomerLabels, topCustomerValues, 10);
             const labels = ranked.map((item) => item.label);
             const values = ranked.map((item) => item.value);
             const total = values.reduce((sum, value) => sum + value, 0);
-            const topCustomerPalette = ['#1D70B8', '#3BA99C', '#E09F3E', '#E36464', '#7A7EE6', '#3E5C76', '#6CC4A1', '#2C6693'];
+            const topCustomerPalette = ['#1D70B8', '#3BA99C', '#E09F3E', '#E36464', '#7A7EE6', '#3E5C76', '#6CC4A1', '#2C6693', '#355E8A', '#52796F'];
+            const salesBarMaxWidth = labels.length > 8 ? 14 : 18;
+            const salesBarCategoryGap = labels.length > 8 ? '58%' : '44%';
 
             const topCustomersChart = echarts.init(topCanvas, null, { renderer: 'canvas' });
             topCustomersChart.setOption({
@@ -588,7 +681,7 @@
                     textStyle: { color: '#31445F' },
                     data: ['Sales Amount']
                 },
-                grid: { left: 126, right: 28, top: 42, bottom: 36, containLabel: true },
+                grid: { left: 112, right: 24, top: 42, bottom: 36, containLabel: true },
                 xAxis: {
                     type: 'value',
                     splitNumber: 4,
@@ -607,11 +700,6 @@
                 yAxis: {
                     type: 'category',
                     inverse: true,
-                    name: 'Customers',
-                    nameLocation: 'middle',
-                    nameGap: 96,
-                    nameRotate: 90,
-                    nameTextStyle: { color: '#516178', fontWeight: 600 },
                     data: labels,
                     axisLabel: {
                         color: '#31445F',
@@ -643,8 +731,8 @@
                         }
                     })),
                     barMinHeight: 6,
-                    barMaxWidth: 18,
-                    barCategoryGap: '44%',
+                    barMaxWidth: salesBarMaxWidth,
+                    barCategoryGap: salesBarCategoryGap,
                     label: {
                         show: true,
                         position: 'right',
@@ -655,7 +743,7 @@
                 }]
             });
             registerChart('topCustomers', topCustomersChart, topCanvas);
-            attachBarKeyboardNavigation(topCustomersChart, topCanvas, labels, values);
+            attachBarKeyboardNavigation(topCustomersChart, topCanvas, labels, values, 'Sales');
         }
 
         if (jcbSummaryCanvas && jcbSummaryLabels && jcbSummaryValues) {

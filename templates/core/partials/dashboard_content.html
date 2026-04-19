@@ -395,8 +395,19 @@
     <div class="grid gap-4 lg:grid-cols-1 cf-mobile-hide-chart">
         <div class="cf-section">
             <div class="card-body">
+                <h2 class="card-title text-xl">Top Customers by Pending Amount</h2>
+                <p class="text-sm text-base-content/70">Overall pending totals (all-time). Date range filter does not apply to this chart.</p>
+                <div class="h-96 sm:h-80 cf-chart-shell">
+                    <div id="top-pending-customers-chart" class="h-full w-full" role="img" tabindex="0" aria-label="Top customers by pending amount chart" aria-describedby="top-pending-customers-chart-help"></div>
+                    <p id="top-pending-customers-chart-help" class="sr-only">Horizontal ranking chart of top customers by pending receivables. Use arrow keys to move between bars and press Enter to lock focus on a selection.</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="cf-section">
+            <div class="card-body">
                 <h2 class="card-title text-xl">Top Customers by Sales</h2>
-                <div class="h-80 sm:h-72 cf-chart-shell">
+                <div class="h-96 sm:h-80 cf-chart-shell">
                     <div id="top-customers-chart" class="h-full w-full" role="img" tabindex="0" aria-label="Top customers by sales chart" aria-describedby="top-customers-chart-help"></div>
                     <p id="top-customers-chart-help" class="sr-only">Horizontal ranking chart of top customers and their sales contributions. Use the arrow keys to move between bars and press Enter to lock focus on a selection.</p>
                 </div>
@@ -534,6 +545,8 @@
     {{ income_expense_values|json_script:'income-expense-values' }}
     {{ jcb_summary_labels|json_script:'jcb-summary-labels' }}
     {{ jcb_summary_values|json_script:'jcb-summary-values' }}
+    {{ top_pending_customer_labels|json_script:'top-pending-customer-labels' }}
+    {{ top_pending_customer_values|json_script:'top-pending-customer-values' }}
     {{ top_customer_labels|json_script:'top-customer-labels' }}
     {{ top_customer_values|json_script:'top-customer-values' }}
     {{ category_expense_labels|json_script:'category-expense-labels' }}

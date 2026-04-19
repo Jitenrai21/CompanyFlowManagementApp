@@ -416,10 +416,50 @@ def _dashboard_context(date_from="", date_to=""):
 		sales_amount_queryset.filter(customer__isnull=False)
 		.values("customer_id", "customer__name")
 		.annotate(total=Coalesce(Sum("total_amount"), Value(Decimal("0.00"))))
-		.order_by("-total", "customer__name", "customer_id")[:5]
+		.order_by("-total", "customer__name", "customer_id")[:10]
 	)
 	top_customer_labels = [row["customer__name"] for row in top_customer_rows]
 	top_customer_values = [float(row["total"]) for row in top_customer_rows]
+
+	# Pending receivables ranking should always reflect overall outstanding dues,
+	# independent from dashboard date filters.
+	all_time_sales_queryset = _dashboard_base_sales_queryset()
+	all_time_sales_rows = list(all_time_sales_queryset)
+
+	pending_customer_totals = {}
+	for sale in all_time_sales_rows:
+		if sale.status != RecordStatus.PENDING:
+			continue
+		if not sale.customer_id:
+			continue
+		pending_amount = sale.total_amount - sale.received_total
+		if pending_amount <= 0:
+			continue
+		customer_key = sale.customer_id
+		if customer_key not in pending_customer_totals:
+			pending_customer_totals[customer_key] = {
+				"name": sale.customer.name,
+				"total": Decimal("0.00"),
+			}
+		pending_customer_totals[customer_key]["total"] += pending_amount
+
+	# Include legacy manually added due amounts in customer pending totals.
+	for customer in Customer.objects.filter(manual_due_amount__gt=0).only("id", "name", "manual_due_amount"):
+		customer_key = customer.id
+		if customer_key not in pending_customer_totals:
+			pending_customer_totals[customer_key] = {
+				"name": customer.name,
+				"total": Decimal("0.00"),
+			}
+		pending_customer_totals[customer_key]["total"] += customer.manual_due_amount
+
+	top_pending_customer_rows = sorted(
+		pending_customer_totals.values(),
+		key=lambda row: row["total"],
+		reverse=True,
+	)[:10]
+	top_pending_customer_labels = [row["name"] for row in top_pending_customer_rows]
+	top_pending_customer_values = [float(row["total"]) for row in top_pending_customer_rows]
 
 	jcb_summary_labels = ["JCB Income", "JCB Expense"]
 	jcb_summary_values = [
@@ -635,6 +675,8 @@ def _dashboard_context(date_from="", date_to=""):
 		"jcb_summary_values": jcb_summary_values,
 		"top_customer_labels": top_customer_labels,
 		"top_customer_values": top_customer_values,
+		"top_pending_customer_labels": top_pending_customer_labels,
+		"top_pending_customer_values": top_pending_customer_values,
 		"category_expense_labels": category_expense_labels,
 		"category_expense_values": category_expense_values,
 		"category_income_labels": category_income_labels,
