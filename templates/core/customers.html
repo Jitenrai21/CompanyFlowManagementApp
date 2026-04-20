@@ -23,7 +23,7 @@
     <form id="customers-filter-form" method="get" class="cf-filter-panel grid gap-3 md:grid-cols-3">
         <label class="form-control">
             <span class="label-text mb-1">Search</span>
-            <input type="text" name="q" value="{{ filters.q }}" class="input input-bordered w-full" placeholder="Name, phone, address, credit terms" />
+            <input type="text" name="q" value="{{ filters.q }}" class="input input-bordered w-full" placeholder="Name, phone, address" />
         </label>
         <label class="form-control">
             <span class="label-text mb-1">Type</span>
@@ -54,43 +54,76 @@
             <span class="text-xs text-base-content/60">{{ customers|length }} customer{{ customers|length|pluralize }}</span>
         </div>
         <div class="overflow-x-auto">
-            <table class="table table-zebra">
+            <table class="table table-zebra min-w-[900px]">
                 <thead>
                     <tr>
-                        <th>Name</th>
-                        <th>Type</th>
-                        <th>Phone</th>
-                        <th>Credit Terms</th>
-                        <th>Opening Balance</th>
-                        <th class="text-right">Actions</th>
+                        <th class="whitespace-nowrap">Name</th>
+                        <th class="whitespace-nowrap">Type</th>
+                        <th class="whitespace-nowrap">Phone</th>
+                        <th class="whitespace-nowrap">Due Amount</th>
+                        <th class="whitespace-nowrap">Total Sales</th>
+                        <th class="whitespace-nowrap">Total Payments</th>
+                        <th class="text-right whitespace-nowrap">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for customer in customers %}
                     <tr>
-                        <td>{{ customer.name }}</td>
-                        <td><span class="badge badge-outline">{{ customer.get_type_display }}</span></td>
-                        <td>{{ customer.phone|default:'-' }}</td>
-                        <td>{{ customer.credit_terms|default:'-' }}</td>
-                        <td>NPR {{ customer.opening_balance|npr_amount }}</td>
-                        <td class="text-right">
-                            <a href="{% url 'customer_detail' customer.id %}" class="btn btn-xs btn-outline">View</a>
-                            <a href="{% url 'customer_edit' customer.id %}" class="btn btn-xs btn-ghost">Edit</a>
-                            <form method="post"
-                                  action="{% url 'customer_delete' customer.id %}"
-                                  hx-post="{% url 'customer_delete' customer.id %}"
-                                  hx-target="closest tr"
-                                  hx-swap="delete"
-                                  onsubmit="return confirm('Delete customer {{ customer.name }}? Linked sales and transactions will be unassigned.');"
-                                  class="inline">
-                                {% csrf_token %}
-                                <button type="submit" class="btn btn-xs btn-error btn-outline" aria-label="Delete customer {{ customer.name }}">Delete</button>
-                            </form>
+                        <td class="whitespace-nowrap">
+                            <a href="{% url 'customer_detail' customer.id %}" class="link link-primary font-medium">{{ customer.name }}</a>
+                        </td>
+                        <td class="whitespace-nowrap"><span class="badge badge-outline">{{ customer.get_type_display }}</span></td>
+                        <td class="whitespace-nowrap">{{ customer.phone|default:'-' }}</td>
+                        <td class="whitespace-nowrap tabular-nums {% if customer.due_amount > 0 %}text-error{% endif %}">NPR {{ customer.due_amount|npr_amount }}</td>
+                        <td class="whitespace-nowrap tabular-nums">NPR {{ customer.total_sales|npr_amount }}</td>
+                        <td class="whitespace-nowrap tabular-nums">NPR {{ customer.total_payments|npr_amount }}</td>
+                        <td class="text-right whitespace-nowrap">
+                            <div class="inline-flex min-h-8 items-center justify-end gap-1 whitespace-nowrap">
+                                <div class="hidden md:flex items-center justify-end gap-1">
+                                    <a href="{% url 'customer_detail' customer.id %}" class="btn btn-xs btn-square btn-outline" title="View customer" aria-label="View customer {{ customer.name }}">
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-3.5 w-3.5" aria-hidden="true"><path d="M10 3c-4.5 0-8.25 2.5-9.5 6.5C1.75 13.5 5.5 16 10 16s8.25-2.5 9.5-6.5C18.25 5.5 14.5 3 10 3zm0 10a3.5 3.5 0 110-7 3.5 3.5 0 010 7z" /></svg>
+                                    </a>
+                                    <a href="{% url 'customer_edit' customer.id %}" class="btn btn-xs btn-square btn-ghost" title="Edit customer" aria-label="Edit customer {{ customer.name }}">
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-3.5 w-3.5" aria-hidden="true"><path d="M13.586 2.586a2 2 0 112.828 2.828l-8.9 8.9a1 1 0 01-.424.26l-3 1a1 1 0 01-1.264-1.264l1-3a1 1 0 01.26-.424l8.9-8.9z" /></svg>
+                                    </a>
+                                    <form method="post"
+                                          action="{% url 'customer_delete' customer.id %}"
+                                          hx-post="{% url 'customer_delete' customer.id %}"
+                                          hx-target="closest tr"
+                                          hx-swap="delete"
+                                          onsubmit="return confirm('Delete customer {{ customer.name }}? Linked sales and transactions will be unassigned.');"
+                                          class="inline">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn btn-xs btn-square btn-error btn-outline" title="Delete customer" aria-label="Delete customer {{ customer.name }}">
+                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-3.5 w-3.5" aria-hidden="true"><path fill-rule="evenodd" d="M7 2a1 1 0 00-.894.553L5.382 4H3a1 1 0 000 2h.293l.94 9.405A2 2 0 006.222 17h7.556a2 2 0 001.989-1.595L16.707 6H17a1 1 0 100-2h-2.382l-.724-1.447A1 1 0 0013 2H7zm2 5a1 1 0 10-2 0v6a1 1 0 102 0V7zm4 0a1 1 0 10-2 0v6a1 1 0 102 0V7z" clip-rule="evenodd" /></svg>
+                                        </button>
+                                    </form>
+                                </div>
+
+                                <div class="dropdown dropdown-end md:hidden">
+                                    <label tabindex="0" class="btn btn-xs btn-outline">Actions</label>
+                                    <div tabindex="0" class="dropdown-content z-[1] mt-2 w-44 rounded-box border border-base-300 bg-base-100 p-2 shadow">
+                                        <div class="flex flex-col gap-1">
+                                            <a href="{% url 'customer_detail' customer.id %}" class="btn btn-xs btn-ghost justify-start">View</a>
+                                            <a href="{% url 'customer_edit' customer.id %}" class="btn btn-xs btn-ghost justify-start">Edit</a>
+                                            <form method="post"
+                                                  action="{% url 'customer_delete' customer.id %}"
+                                                  hx-post="{% url 'customer_delete' customer.id %}"
+                                                  hx-target="closest tr"
+                                                  hx-swap="delete"
+                                                  onsubmit="return confirm('Delete customer {{ customer.name }}? Linked sales and transactions will be unassigned.');">
+                                                {% csrf_token %}
+                                                <button type="submit" class="btn btn-xs btn-error btn-outline w-full justify-start">Delete</button>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </td>
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="6" class="py-0">
+                        <td colspan="7" class="py-0">
                             <div class="cf-empty">
                                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M10 3a4 4 0 110 8 4 4 0 010-8zm-7 13a7 7 0 1114 0H3z" /></svg>
                                 <p>No customers found for current filters.</p>

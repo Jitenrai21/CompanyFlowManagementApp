@@ -7,7 +7,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.db import transaction as db_transaction
-from django.db.models import Case, CharField, DecimalField, ExpressionWrapper, F, IntegerField, Q, Sum, Value, When
+from django.db.models import Case, CharField, DecimalField, ExpressionWrapper, F, IntegerField, OuterRef, Q, Subquery, Sum, Value, When
 from django.db.models.functions import Coalesce
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -68,6 +68,17 @@ JCB_INCOME_CATEGORY = "JCB Income"
 JCB_EXPENSE_CATEGORY = "JCB Expense"
 TIPPER_EXPENSE_CATEGORY = "Tipper Expense"
 UNASSIGNED_CUSTOMER_FILTER = "__unassigned__"
+
+
+def _calculate_customer_due_amount(total_sales, total_payments, manual_due_amount, credit_balance=Decimal("0.00")):
+	due_amount = total_sales - total_payments + manual_due_amount
+	if due_amount < 0:
+		available_credit = max(credit_balance, Decimal("0.00"))
+		if available_credit > 0:
+			due_amount = -min(abs(due_amount), available_credit)
+		else:
+			due_amount = Decimal("0.00")
+	return due_amount
 
 
 def _get_or_create_predefined_category(name):
@@ -1114,12 +1125,12 @@ def _customer_payment_context(customer):
 	).aggregate(
 		total_income=Coalesce(Sum("amount"), Value(Decimal("0.00"))),
 	)
-	due_amount = payment_totals["total_sales"] - payment_totals["total_paid"]
-	if due_amount < 0:
-		due_amount = Decimal("0.00")
-	
-	# Add manual due amount if set
-	due_amount += customer.manual_due_amount
+	due_amount = _calculate_customer_due_amount(
+		payment_totals["total_sales"],
+		payment_totals["total_paid"],
+		customer.manual_due_amount,
+		customer.credit_balance,
+	)
 
 	return {
 		"sales": sales,
@@ -1969,7 +1980,23 @@ def sale_receipt_create(request, pk):
 
 @login_required
 def customers(request):
-	queryset = Customer.objects.all()
+	customer_sales_total = (
+		Sale.objects.filter(customer=OuterRef("pk"))
+		.values("customer")
+		.annotate(total=Coalesce(Sum("total_amount"), Value(Decimal("0.00"))))
+		.values("total")[:1]
+	)
+	customer_payment_total = (
+		Transaction.objects.filter(customer=OuterRef("pk"), type=TransactionType.INCOME)
+		.exclude(category__name=CREDIT_BALANCE_APPLIED_CATEGORY)
+		.values("customer")
+		.annotate(total=Coalesce(Sum("amount"), Value(Decimal("0.00"))))
+		.values("total")[:1]
+	)
+	queryset = Customer.objects.annotate(
+		total_sales=Coalesce(Subquery(customer_sales_total, output_field=DecimalField(max_digits=14, decimal_places=2)), Value(Decimal("0.00"))),
+		total_payments=Coalesce(Subquery(customer_payment_total, output_field=DecimalField(max_digits=14, decimal_places=2)), Value(Decimal("0.00"))),
+	)
 	query = request.GET.get("q", "").strip()
 	customer_type = request.GET.get("type", "").strip()
 	credit_status = request.GET.get("credit_status", "").strip()
@@ -1988,8 +2015,17 @@ def customers(request):
 	elif credit_status == "zero_balance":
 		queryset = queryset.filter(opening_balance=0)
 
+	customers = list(queryset.order_by("name"))
+	for customer in customers:
+		customer.due_amount = _calculate_customer_due_amount(
+			customer.total_sales,
+			customer.total_payments,
+			customer.manual_due_amount,
+			customer.credit_balance,
+		)
+
 	context = {
-		"customers": queryset.order_by("name"),
+		"customers": customers,
 		"filters": {
 			"q": query,
 			"type": customer_type,
