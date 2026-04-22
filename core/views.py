@@ -81,6 +81,19 @@ def _calculate_customer_due_amount(total_sales, total_payments, manual_due_amoun
 	return due_amount
 
 
+def _customer_due_amount_from_sales(customer):
+	payment_totals = customer.sales.aggregate(
+		total_sales=Coalesce(Sum("total_amount"), Value(Decimal("0.00"))),
+		total_paid=Coalesce(Sum("paid_amount"), Value(Decimal("0.00"))),
+	)
+	return _calculate_customer_due_amount(
+		payment_totals["total_sales"],
+		payment_totals["total_paid"],
+		customer.manual_due_amount,
+		customer.credit_balance,
+	)
+
+
 def _get_or_create_predefined_category(name):
 	category, _ = TransactionCategory.objects.get_or_create(
 		name=name,
@@ -1118,21 +1131,12 @@ def _customer_payment_context(customer):
 			}
 		)
 
-	payment_totals = sales.aggregate(
-		total_sales=Coalesce(Sum("total_amount"), Value(Decimal("0.00"))),
-		total_paid=Coalesce(Sum("paid_amount"), Value(Decimal("0.00"))),
-	)
 	transaction_totals = customer.transactions.filter(type=TransactionType.INCOME).exclude(
 		category__name=CREDIT_BALANCE_APPLIED_CATEGORY,
 	).aggregate(
 		total_income=Coalesce(Sum("amount"), Value(Decimal("0.00"))),
 	)
-	due_amount = _calculate_customer_due_amount(
-		payment_totals["total_sales"],
-		payment_totals["total_paid"],
-		customer.manual_due_amount,
-		customer.credit_balance,
-	)
+	due_amount = _customer_due_amount_from_sales(customer)
 
 	return {
 		"sales": sales,
@@ -2019,12 +2023,7 @@ def customers(request):
 
 	customers = list(queryset.order_by("name"))
 	for customer in customers:
-		customer.due_amount = _calculate_customer_due_amount(
-			customer.total_sales,
-			customer.total_payments,
-			customer.manual_due_amount,
-			customer.credit_balance,
-		)
+		customer.due_amount = _customer_due_amount_from_sales(customer)
 
 	context = {
 		"customers": customers,
