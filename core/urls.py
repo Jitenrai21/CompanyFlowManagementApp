@@ -4,6 +4,7 @@ from . import views
 
 urlpatterns = [
     path("", views.dashboard, name="dashboard"),
+    path("calendar-mode/<str:mode>/", views.set_calendar_mode, name="set_calendar_mode"),
     path("reports/export/", views.export_report, name="export_report"),
     path("cash-entries/", views.cash_entries, name="cash_entries"),
     path("cash-entries/new/", views.transaction_create, name="transaction_create"),

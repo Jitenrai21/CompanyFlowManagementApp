@@ -481,7 +481,7 @@
                     <tbody>
                         {% for tx in recent_transactions %}
                         <tr>
-                            <td>{{ tx.date }}</td>
+                            <td>{{ tx.date|calendar_date:request }}</td>
                             <td>{{ tx.get_type_display }}</td>
                             <td class="js-npr-value" data-npr-value="{{ tx.amount }}">NPR {{ tx.amount|npr_amount }}</td>
                         </tr>
@@ -521,7 +521,7 @@
                         <tr>
                             <td><a href="{% url 'customer_detail' customer.id %}" class="link link-primary">{{ customer.name }}</a></td>
                             <td>{{ customer.get_type_display }}</td>
-                            <td>{{ customer.created_at|date:'Y-m-d' }}</td>
+                            <td>{{ customer.created_at|calendar_date:request }}</td>
                         </tr>
                         {% empty %}
                         <tr>

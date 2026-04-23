@@ -7,7 +7,6 @@ from django.core.management import call_command
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
-from bs_dates import bs_add_days, bs_today_date
 
 from .forms import SaleForm
 from .models import (
@@ -35,6 +34,14 @@ from .models import (
 )
 
 
+def bs_today_date():
+	return timezone.localdate()
+
+
+def bs_add_days(base_date, days):
+	return base_date + timedelta(days=days)
+
+
 class SalesWorkflowTests(TestCase):
 	def setUp(self):
 		user_model = get_user_model()
@@ -51,6 +58,11 @@ class SalesWorkflowTests(TestCase):
 			items=[{"item": "Item A", "quantity": 2, "price": 500}],
 			notes="Monthly recurring order",
 		)
+
+	def _set_calendar_mode(self, mode):
+		session = self.client.session
+		session["calendar_mode"] = mode
+		session.save()
 
 	def test_sale_detail_requires_login(self):
 		response = self.client.get(reverse("sale_detail", args=[self.sale.pk]))
@@ -117,6 +129,66 @@ class SalesWorkflowTests(TestCase):
 	def test_sale_form_defaults_due_date_to_today_for_new_sale(self):
 		form = SaleForm()
 		self.assertEqual(form.fields["due_date"].initial, bs_today_date())
+
+	def test_sales_filter_accepts_bs_dates_in_bs_mode(self):
+		self.client.login(username="tester", password="pass1234")
+		self.sale.refresh_from_db()
+		self._set_calendar_mode("bs")
+
+		response = self.client.get(
+			reverse("sales"),
+			{
+				"date_from": self.sale.bs_date,
+				"date_to": self.sale.bs_date,
+			},
+		)
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, "INV-1001")
+
+	def test_sale_form_accepts_bs_dates_in_bs_mode(self):
+		self.client.login(username="tester", password="pass1234")
+		self.sale.refresh_from_db()
+
+		form = SaleForm(
+			data={
+				"invoice_number": "INV-2003",
+				"date": self.sale.bs_date,
+				"customer_input": self.customer.name,
+				"items": json.dumps([{"item": "Good Item", "quantity": 1, "price": 100}]),
+				"notes": "Test",
+				"total_amount": "100",
+				"due_date": self.sale.bs_due_date,
+				"status": RecordStatus.PENDING,
+				"alert_enabled": "on",
+			},
+			calendar_mode="bs",
+		)
+
+		self.assertTrue(form.is_valid())
+		self.assertEqual(form.cleaned_data["date"], self.sale.date)
+		self.assertEqual(form.cleaned_data["due_date"], self.sale.due_date)
+
+	def test_sale_form_rejects_invalid_bs_dates_in_bs_mode(self):
+		self.client.login(username="tester", password="pass1234")
+
+		form = SaleForm(
+			data={
+				"invoice_number": "INV-2004",
+				"date": "2082-99-99",
+				"customer_input": self.customer.name,
+				"items": json.dumps([{"item": "Good Item", "quantity": 1, "price": 100}]),
+				"notes": "Test",
+				"total_amount": "100",
+				"due_date": "2082-13-40",
+				"status": RecordStatus.PENDING,
+			},
+			calendar_mode="bs",
+		)
+
+		self.assertFalse(form.is_valid())
+		self.assertIn("date", form.errors)
+		self.assertIn("valid BS date", str(form.errors.get("due_date", "")))
 
 	def test_inline_receipt_create_links_to_sale(self):
 		self.client.login(username="tester", password="pass1234")

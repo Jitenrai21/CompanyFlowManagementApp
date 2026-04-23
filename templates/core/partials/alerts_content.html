@@ -57,7 +57,7 @@
                             {% endif %}
                         </td>
                         <td>{% if item.customer %}<a href="{% url 'customer_detail' item.customer.id %}" class="link link-primary">{{ item.customer.name }}</a>{% else %}-{% endif %}</td>
-                        <td>{{ item.due_date }}</td>
+                        <td>{{ item.due_date|calendar_date:request }}</td>
                         <td>{% if item.source == 'manual' %}N/A{% else %}NPR {{ item.amount|npr_amount }}{% endif %}</td>
                         <td>{{ item.status_label }}</td>
                     </tr>
@@ -115,7 +115,7 @@
                             {% endif %}
                         </td>
                         <td>{{ note.title }}</td>
-                        <td>{{ note.due_date }}</td>
+                        <td>{{ note.due_date|calendar_date:request }}</td>
                         <td>
                             {% if note.is_active %}
                             <div class="flex flex-wrap gap-1">

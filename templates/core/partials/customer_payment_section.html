@@ -42,7 +42,7 @@
                         </label>
                         <label class="form-control">
                             <span class="label-text">Payment Date</span>
-                            <input type="date" name="payment_date" value="{{ today|date:'Y-m-d' }}" class="input input-bordered">
+                            <input type="{% if calendar_mode_is_bs %}text{% else %}date{% endif %}" name="payment_date" value="{{ payment_date_value|default:today|date:'Y-m-d' }}" class="input input-bordered" placeholder="{% if calendar_mode_is_bs %}YYYY-MM-DD (BS){% endif %}" title="Date format: {% if calendar_mode_is_bs %}BS{% else %}AD{% endif %}">
                         </label>
                         <label class="form-control sm:col-span-2">
                             <span class="label-text">Payment Method</span>
@@ -77,7 +77,7 @@
                             <span>
                                 <input type="checkbox" name="sale_ids" value="{{ row.sale.id }}" class="checkbox checkbox-primary border-base-300 scale-105">
                             </span>
-                            <span>{{ row.sale.invoice_number }} | {{ row.sale.date }}</span>
+                            <span>{{ row.sale.invoice_number }} | {{ row.sale.date|calendar_date:request }}</span>
                             <span class="font-semibold">NPR {{ row.due_amount|npr_amount }}</span>
                         </label>
                         {% empty %}

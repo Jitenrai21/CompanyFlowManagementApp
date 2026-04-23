@@ -55,7 +55,7 @@
                     <tbody>
                         {% for tx in transactions %}
                         <tr>
-                            <td>{{ tx.date }}</td>
+                            <td>{{ tx.date|calendar_date:request }}</td>
                             <td>{{ tx.get_type_display }}</td>
                             <td>{{ tx.category }}</td>
                             <td>NPR {{ tx.amount|npr_amount }}</td>
@@ -77,7 +77,7 @@
                         {% for row in sales_rows %}
                         <tr>
                             <td><a href="{% url 'sale_detail' row.sale.id %}" class="link link-primary">{{ row.sale.invoice_number }}</a></td>
-                            <td>{{ row.sale.date }}</td>
+                            <td>{{ row.sale.date|calendar_date:request }}</td>
                             <td>NPR {{ row.sale.total_amount|npr_amount }}</td>
                             <td>NPR {{ row.sale.paid_amount|npr_amount }}</td>
                             <td>NPR {{ row.due_amount|npr_amount }}</td>
@@ -115,7 +115,7 @@
                     {% for row in pending_sales_rows %}
                     <tr data-pending-row="true" data-total-amount="{{ row.sale.total_amount }}" data-paid-amount="{{ row.sale.paid_amount }}" data-due-amount="{{ row.due_amount }}">
                         <td><a href="{% url 'sale_detail' row.sale.id %}" class="link link-primary">{{ row.sale.invoice_number }}</a></td>
-                        <td>{{ row.sale.date }}</td>
+                        <td>{{ row.sale.date|calendar_date:request }}</td>
                         <td>
                             {% if row.sale.items %}
                                 <div class="space-y-1 text-xs leading-tight">

@@ -34,11 +34,11 @@
         </label>
         <label class="form-control">
             <span class="label-text mb-1">From</span>
-            <input type="date" name="date_from" value="{{ filters.date_from }}" class="input input-bordered w-full" />
+            <input type="{% if calendar_mode_is_bs %}text{% else %}date{% endif %}" name="date_from" value="{{ filters.date_from }}" class="input input-bordered w-full" placeholder="{% if calendar_mode_is_bs %}YYYY-MM-DD (BS){% endif %}" title="Date format: {% if calendar_mode_is_bs %}BS{% else %}AD{% endif %}" />
         </label>
         <label class="form-control">
             <span class="label-text mb-1">To</span>
-            <input type="date" name="date_to" value="{{ filters.date_to }}" class="input input-bordered w-full" />
+            <input type="{% if calendar_mode_is_bs %}text{% else %}date{% endif %}" name="date_to" value="{{ filters.date_to }}" class="input input-bordered w-full" placeholder="{% if calendar_mode_is_bs %}YYYY-MM-DD (BS){% endif %}" title="Date format: {% if calendar_mode_is_bs %}BS{% else %}AD{% endif %}" />
         </label>
         <label class="form-control">
             <span class="label-text mb-1">Record Type</span>

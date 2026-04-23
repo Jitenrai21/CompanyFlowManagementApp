@@ -21,11 +21,11 @@
             >
                 <label class="form-control">
                     <span class="label-text text-xs">From</span>
-                    <input type="date" name="date_from" value="{{ filters.date_from|default:'' }}" class="input input-bordered input-sm" aria-label="Filter from date" />
+                    <input type="{% if calendar_mode_is_bs %}text{% else %}date{% endif %}" name="date_from" value="{{ filters.date_from|default:'' }}" class="input input-bordered input-sm" aria-label="Filter from date" placeholder="{% if calendar_mode_is_bs %}YYYY-MM-DD (BS){% endif %}" title="Date format: {% if calendar_mode_is_bs %}BS{% else %}AD{% endif %}" />
                 </label>
                 <label class="form-control">
                     <span class="label-text text-xs">To</span>
-                    <input type="date" name="date_to" value="{{ filters.date_to|default:'' }}" class="input input-bordered input-sm" aria-label="Filter to date" />
+                    <input type="{% if calendar_mode_is_bs %}text{% else %}date{% endif %}" name="date_to" value="{{ filters.date_to|default:'' }}" class="input input-bordered input-sm" aria-label="Filter to date" placeholder="{% if calendar_mode_is_bs %}YYYY-MM-DD (BS){% endif %}" title="Date format: {% if calendar_mode_is_bs %}BS{% else %}AD{% endif %}" />
                 </label>
                 <div class="flex items-end">
                     <div class="grid w-full grid-cols-2 gap-2">

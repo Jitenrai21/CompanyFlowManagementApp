@@ -23,7 +23,7 @@
             <tbody>
                 {% for record in blocks_records %}
                 <tr>
-                    <td><span class="font-medium">{{ record.date }}</span></td>
+                    <td><span class="font-medium">{{ record.date|calendar_date:request }}</span></td>
                     <td>
                         {% if record.record_type == 'sale' %}
                             <div class="badge badge-sm badge-success badge-outline gap-1 whitespace-nowrap">

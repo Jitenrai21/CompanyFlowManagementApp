@@ -23,7 +23,7 @@
             <div class="card-body space-y-4">
                 <h2 class="card-title text-xl">Transaction Information</h2>
                 <div class="grid gap-3 text-sm md:grid-cols-2">
-                    <p><span class="font-semibold">Date:</span> {{ transaction.date }}</p>
+                    <p><span class="font-semibold">Date:</span> {{ transaction.date|calendar_date:request }}</p>
                     <p>
                         <span class="font-semibold">Type:</span>
                         <span class="badge {% if transaction.type == 'income' %}badge-success{% else %}badge-error{% endif %} badge-outline ml-1">
@@ -35,10 +35,10 @@
                     <p><span class="font-semibold">Category:</span> {{ transaction.category }}</p>
                     <p><span class="font-semibold">Customer:</span> {% if transaction.customer %}{{ transaction.customer.name }}{% else %}Unassigned{% endif %}</p>
                     <p><span class="font-semibold">Linked Sale:</span> {% if transaction.sale %}<a href="{% url 'sale_detail' transaction.sale.id %}" class="link link-primary">{{ transaction.sale.invoice_number }}</a>{% else %}None{% endif %}</p>
-                    <p><span class="font-semibold">Linked Bamboo Record:</span> {% if transaction.bamboo_record %}<a href="{% url 'bamboo_records' %}" class="link link-primary">{{ transaction.bamboo_record.date }}</a>{% else %}None{% endif %}</p>
-                    <p><span class="font-semibold">Linked Cement Record:</span> {% if transaction.cement_record %}<a href="{% url 'cement_records' %}" class="link link-primary">{{ transaction.cement_record.date }}</a>{% else %}None{% endif %}</p>
-                    <p><span class="font-semibold">Linked Tipper Record:</span> {% if transaction.tipper_record %}<a href="{% url 'tipper_record_detail' transaction.tipper_record.id %}" class="link link-primary">{{ transaction.tipper_record.item.name }} ({{ transaction.tipper_record.date }})</a>{% else %}None{% endif %}</p>
-                    <p><span class="font-semibold">Linked JCB Record:</span> {% if transaction.jcb_record %}{{ transaction.jcb_record.date }}{% else %}None{% endif %}</p>
+                    <p><span class="font-semibold">Linked Bamboo Record:</span> {% if transaction.bamboo_record %}<a href="{% url 'bamboo_records' %}" class="link link-primary">{{ transaction.bamboo_record.date|calendar_date:request }}</a>{% else %}None{% endif %}</p>
+                    <p><span class="font-semibold">Linked Cement Record:</span> {% if transaction.cement_record %}<a href="{% url 'cement_records' %}" class="link link-primary">{{ transaction.cement_record.date|calendar_date:request }}</a>{% else %}None{% endif %}</p>
+                    <p><span class="font-semibold">Linked Tipper Record:</span> {% if transaction.tipper_record %}<a href="{% url 'tipper_record_detail' transaction.tipper_record.id %}" class="link link-primary">{{ transaction.tipper_record.item.name }} ({{ transaction.tipper_record.date|calendar_date:request }})</a>{% else %}None{% endif %}</p>
+                    <p><span class="font-semibold">Linked JCB Record:</span> {% if transaction.jcb_record %}{{ transaction.jcb_record.date|calendar_date:request }}{% else %}None{% endif %}</p>
                     <p class="md:col-span-2"><span class="font-semibold">Description:</span> {{ transaction.description|default:'-' }}</p>
                     <p class="md:col-span-2">
                         <span class="font-semibold">Attachment:</span>
@@ -56,13 +56,13 @@
             <div class="cf-section">
                 <div class="card-body">
                     <p class="text-sm text-base-content/60">Created</p>
-                    <p class="text-lg font-semibold">{{ transaction.created_at|date:'Y-m-d H:i' }}</p>
+                    <p class="text-lg font-semibold">{{ transaction.created_at|calendar_datetime:request }}</p>
                 </div>
             </div>
             <div class="cf-section">
                 <div class="card-body">
                     <p class="text-sm text-base-content/60">Last Updated</p>
-                    <p class="text-lg font-semibold">{{ transaction.updated_at|date:'Y-m-d H:i' }}</p>
+                    <p class="text-lg font-semibold">{{ transaction.updated_at|calendar_datetime:request }}</p>
                 </div>
             </div>
             {% if transaction.sale %}
@@ -78,7 +78,7 @@
             <div class="cf-section">
                 <div class="card-body">
                     <p class="text-sm text-base-content/60">Cement Context</p>
-                    <p class="text-lg font-semibold">{{ transaction.cement_record.get_record_type_display }} - {{ transaction.cement_record.date }}</p>
+                    <p class="text-lg font-semibold">{{ transaction.cement_record.get_record_type_display }} - {{ transaction.cement_record.date|calendar_date:request }}</p>
                     <a href="{% url 'cement_records' %}" class="btn btn-sm btn-outline mt-2">Open Cement Records</a>
                 </div>
             </div>
@@ -87,7 +87,7 @@
             <div class="cf-section">
                 <div class="card-body">
                     <p class="text-sm text-base-content/60">Bamboo Context</p>
-                    <p class="text-lg font-semibold">{{ transaction.bamboo_record.get_record_type_display }} - {{ transaction.bamboo_record.date }}</p>
+                    <p class="text-lg font-semibold">{{ transaction.bamboo_record.get_record_type_display }} - {{ transaction.bamboo_record.date|calendar_date:request }}</p>
                     <a href="{% url 'bamboo_records' %}" class="btn btn-sm btn-outline mt-2">Open Bamboo Records</a>
                 </div>
             </div>

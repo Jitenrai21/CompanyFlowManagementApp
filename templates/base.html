@@ -1,4 +1,4 @@
-{% load static %}
+{% load static core_format %}
 <!doctype html>
 <html lang="en" data-theme="companyflow">
 <head>
@@ -31,7 +31,7 @@
     <script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
     <link rel="stylesheet" href="{% static 'core/theme.css' %}">
 </head>
-<body class="cf-app min-h-screen text-base-content">
+<body class="cf-app min-h-screen text-base-content" data-calendar-mode="{{ calendar_mode }}">
     {% if user.is_authenticated %}
     <div class="drawer lg:drawer-open">
         <input id="app-drawer" type="checkbox" class="drawer-toggle" />
@@ -58,6 +58,10 @@
                     </a>
                 </div>
                 <div class="flex-none gap-2 cf-topbar-actions">
+                    <div class="join hidden sm:inline-flex" role="group" aria-label="Calendar mode toggle">
+                        <a href="{% url 'set_calendar_mode' 'ad' %}?next={{ request.get_full_path|urlencode }}" class="btn btn-xs join-item {% if calendar_mode_is_ad %}btn-primary{% else %}btn-outline{% endif %}">AD</a>
+                        <a href="{% url 'set_calendar_mode' 'bs' %}?next={{ request.get_full_path|urlencode }}" class="btn btn-xs join-item {% if calendar_mode_is_bs %}btn-primary{% else %}btn-outline{% endif %}">BS</a>
+                    </div>
                     <span class="hidden sm:inline text-sm text-base-content/70">{{ request.user.username }}</span>
                     <form method="post" action="{% url 'logout' %}">
                         {% csrf_token %}
@@ -221,17 +225,18 @@
             </p>
             <form id="report-export-form" method="get" action="{% url 'export_report' %}" class="cf-export-form mt-4 grid gap-3 sm:grid-cols-2">
                 <input type="hidden" name="report" id="report-export-type" value="">
+                <input type="hidden" name="calendar_mode" value="{{ calendar_mode }}">
                 <div>
                     <label class="label" for="report-export-date-from">
                         <span class="label-text">From</span>
                     </label>
-                    <input id="report-export-date-from" type="date" name="date_from" class="input input-bordered w-full">
+                    <input id="report-export-date-from" type="{% if calendar_mode_is_bs %}text{% else %}date{% endif %}" name="date_from" class="input input-bordered w-full" placeholder="{% if calendar_mode_is_bs %}YYYY-MM-DD (BS){% endif %}" title="Date format: {% if calendar_mode_is_bs %}BS{% else %}AD{% endif %}">
                 </div>
                 <div>
                     <label class="label" for="report-export-date-to">
                         <span class="label-text">To</span>
                     </label>
-                    <input id="report-export-date-to" type="date" name="date_to" class="input input-bordered w-full">
+                    <input id="report-export-date-to" type="{% if calendar_mode_is_bs %}text{% else %}date{% endif %}" name="date_to" class="input input-bordered w-full" placeholder="{% if calendar_mode_is_bs %}YYYY-MM-DD (BS){% endif %}" title="Date format: {% if calendar_mode_is_bs %}BS{% else %}AD{% endif %}">
                 </div>
                 <div class="sm:col-span-2">
                     <label class="label" for="report-export-format">
@@ -455,10 +460,23 @@
             });
         }
 
+        function initCalendarDateInputs() {
+            const mode = document.body.dataset.calendarMode || 'ad';
+            document.querySelectorAll('input[data-calendar-input="true"]').forEach((input) => {
+                if (mode === 'bs') {
+                    input.setAttribute('placeholder', input.getAttribute('placeholder') || 'YYYY-MM-DD (BS)');
+                    input.setAttribute('title', 'Date format: BS (YYYY-MM-DD)');
+                } else {
+                    input.setAttribute('title', 'Date format: AD (YYYY-MM-DD)');
+                }
+            });
+        }
+
         document.addEventListener('DOMContentLoaded', applyRevealAnimations);
         document.addEventListener('DOMContentLoaded', initResponsiveDrawer);
         document.addEventListener('DOMContentLoaded', initCustomerAutocomplete);
         document.addEventListener('DOMContentLoaded', initCategoryAutocomplete);
+        document.addEventListener('DOMContentLoaded', initCalendarDateInputs);
         function showToast(message, level = 'info') {
             const stack = document.getElementById('cf-toast-stack');
             if (!stack || !message) {
@@ -502,6 +520,7 @@
         document.body.addEventListener('htmx:afterSwap', () => {
             initCustomerAutocomplete();
             initCategoryAutocomplete();
+            initCalendarDateInputs();
             applyRevealAnimations();
         });
     </script>

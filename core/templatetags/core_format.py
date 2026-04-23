@@ -1,6 +1,11 @@
 from decimal import Decimal, InvalidOperation
+from datetime import date as date_class, datetime as datetime_class
 
 from django import template
+from django.utils import timezone
+
+from core.bs_date_utils import ad_to_bs_string
+from core.calendar_mode import CALENDAR_MODE_BS, get_calendar_mode
 
 
 register = template.Library()
@@ -53,3 +58,54 @@ def npr_amount(value):
         return f"{sign}{grouped_integer}"
 
     return f"{sign}{grouped_integer}.{fractional_part}"
+
+
+def _as_date(value):
+    if value in (None, ""):
+        return None
+    if isinstance(value, datetime_class):
+        return value.date()
+    if isinstance(value, date_class):
+        return value
+    text = str(value).strip()
+    if not text:
+        return None
+    try:
+        return date_class.fromisoformat(text)
+    except ValueError:
+        return None
+
+
+@register.filter
+def calendar_date(value, request=None):
+    current_date = _as_date(value)
+    if current_date is None:
+        return ""
+
+    if get_calendar_mode(request) == CALENDAR_MODE_BS:
+        bs_value = ad_to_bs_string(current_date)
+        return bs_value or current_date.isoformat()
+
+    return current_date.isoformat()
+
+
+@register.filter
+def calendar_datetime(value, request=None):
+    if not value:
+        return ""
+
+    current_datetime = value
+    if not isinstance(current_datetime, datetime_class):
+        try:
+            current_datetime = datetime_class.fromisoformat(str(value).strip())
+        except ValueError:
+            return str(value)
+
+    local_dt = timezone.localtime(current_datetime) if timezone.is_aware(current_datetime) else current_datetime
+    time_label = local_dt.strftime("%H:%M")
+
+    if get_calendar_mode(request) == CALENDAR_MODE_BS:
+        bs_value = ad_to_bs_string(local_dt.date())
+        return f"{bs_value} {time_label}" if bs_value else local_dt.strftime("%Y-%m-%d %H:%M")
+
+    return local_dt.strftime("%Y-%m-%d %H:%M")

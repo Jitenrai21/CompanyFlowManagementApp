@@ -19,7 +19,7 @@
             <tbody>
                 {% for record in tipper_records %}
                 <tr>
-                    <td>{{ record.date }}</td>
+                    <td>{{ record.date|calendar_date:request }}</td>
                     <td>{{ record.item.name }}</td>
                     <td>
                         <span class="badge badge-sm whitespace-nowrap gap-1 {% if record.record_type == 'expense' %}badge-error badge-outline{% else %}badge-success badge-outline{% endif %}">

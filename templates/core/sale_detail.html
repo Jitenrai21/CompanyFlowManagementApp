@@ -50,8 +50,8 @@
                     <p><span class="font-semibold">Customer:</span> {% if sale.customer %}{{ sale.customer.name }}{% else %}Unassigned{% endif %}</p>
                     <p><span class="font-semibold">Status:</span> {{ sale.get_status_display }}</p>
                     <p><span class="font-semibold">Alert Tracking:</span> {% if sale.alert_enabled %}On{% else %}Off{% endif %}</p>
-                    <p><span class="font-semibold">Date:</span> {{ sale.date }}</p>
-                    <p><span class="font-semibold">Due Date:</span> {{ sale.due_date }}</p>
+                    <p><span class="font-semibold">Date:</span> {{ sale.date|calendar_date:request }}</p>
+                    <p><span class="font-semibold">Due Date:</span> {{ sale.due_date|calendar_date:request }}</p>
                     <p><span class="font-semibold">Total Amount:</span> NPR {{ sale.total_amount|npr_amount }}</p>
                     <p class="md:col-span-2"><span class="font-semibold">Notes:</span> {{ sale.notes|default:'-' }}</p>
                 </div>

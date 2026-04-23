@@ -25,7 +25,7 @@
                 {% for record in jcb_records %}
                 {% if record.expense_item and record.expense_amount and record.start_time == 0 and record.end_time == 0 %}
                 <tr>
-                    <td>{{ record.date }}</td>
+                    <td>{{ record.date|calendar_date:request }}</td>
                     <td>
                         <div class="flex items-center justify-between gap-3 min-w-[14rem]">
                             <span class="truncate font-medium">{{ record.site_name|default:"-" }}</span>
@@ -85,7 +85,7 @@
                 </tr>
                 {% else %}
                 <tr>
-                    <td>{{ record.date }}</td>
+                    <td>{{ record.date|calendar_date:request }}</td>
                     <td>
                         <div class="flex items-center justify-between gap-3 min-w-[14rem]">
                             <span class="truncate font-medium">{{ record.site_name|default:"-" }}</span>

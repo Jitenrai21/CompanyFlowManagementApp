@@ -23,7 +23,7 @@
             <div class="card-body space-y-4">
                 <h2 class="card-title text-xl">Tipper Record Information</h2>
                 <div class="grid gap-3 text-sm md:grid-cols-2">
-                    <p><span class="font-semibold">Date:</span> {{ tipper_record.date }}</p>
+                    <p><span class="font-semibold">Date:</span> {{ tipper_record.date|calendar_date:request }}</p>
                     <p><span class="font-semibold">Item:</span> {{ tipper_record.item.name }}</p>
                     <p>
                         <span class="font-semibold">Type:</span>
@@ -48,13 +48,13 @@
             <div class="cf-section">
                 <div class="card-body">
                     <p class="text-sm text-base-content/60">Created</p>
-                    <p class="text-lg font-semibold">{{ tipper_record.created_at|date:'Y-m-d H:i' }}</p>
+                    <p class="text-lg font-semibold">{{ tipper_record.created_at|calendar_datetime:request }}</p>
                 </div>
             </div>
             <div class="cf-section">
                 <div class="card-body">
                     <p class="text-sm text-base-content/60">Last Updated</p>
-                    <p class="text-lg font-semibold">{{ tipper_record.updated_at|date:'Y-m-d H:i' }}</p>
+                    <p class="text-lg font-semibold">{{ tipper_record.updated_at|calendar_datetime:request }}</p>
                 </div>
             </div>
             <div class="cf-section">

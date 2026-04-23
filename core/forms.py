@@ -4,6 +4,8 @@ from django.utils import timezone
 from decimal import Decimal, InvalidOperation
 from datetime import datetime
 
+from .bs_date_utils import ad_to_bs_string, parse_calendar_date_input
+from .calendar_mode import CALENDAR_MODE_AD, CALENDAR_MODE_BS, normalize_calendar_mode
 from .models import AlertNotification, AlertSource, AlertType, Customer, JCBRecord, Sale, TipperRecord, Transaction
 from .models import TransactionCategory
 from .models import (
@@ -32,6 +34,55 @@ def _decorate_widget(field_name, field):
         field.widget.attrs["class"] = f"file-input file-input-bordered w-full {existing_class}".strip()
     else:
         field.widget.attrs["class"] = f"input input-bordered w-full {existing_class}".strip()
+
+
+def _resolve_form_calendar_mode(kwargs):
+    return normalize_calendar_mode(kwargs.pop("calendar_mode", CALENDAR_MODE_AD))
+
+
+def _configure_form_date_fields(form, field_names):
+    for field_name in field_names:
+        if field_name not in form.fields:
+            continue
+
+        field = form.fields[field_name]
+        widget = field.widget
+        widget.attrs["data-calendar-input"] = "true"
+        widget.attrs["data-calendar-mode"] = form.calendar_mode
+
+        original_to_python = field.to_python
+
+        def calendar_to_python(value, *, _calendar_mode=form.calendar_mode, _original=original_to_python):
+            parsed_value, parse_error = parse_calendar_date_input(value, _calendar_mode)
+            if parse_error:
+                raise ValidationError(parse_error)
+            if parsed_value is not None:
+                return parsed_value
+            return _original(value)
+
+        field.to_python = calendar_to_python
+
+        if form.calendar_mode == CALENDAR_MODE_BS:
+            widget.input_type = "text"
+            widget.attrs["type"] = "text"
+            widget.attrs["placeholder"] = "YYYY-MM-DD (BS)"
+            widget.attrs["inputmode"] = "numeric"
+            widget.attrs["pattern"] = r"\d{4}-\d{2}-\d{2}"
+
+            if not form.is_bound:
+                ad_value = form.initial.get(field_name)
+                if ad_value is None and getattr(form, "instance", None) is not None:
+                    ad_value = getattr(form.instance, field_name, None)
+                bs_value = ad_to_bs_string(ad_value)
+                if bs_value:
+                    form.initial[field_name] = bs_value
+        else:
+            widget.input_type = "date"
+            widget.attrs["type"] = "date"
+
+
+def _normalize_form_date_fields(form, cleaned_data, field_names):
+    return cleaned_data
 
 
 class CustomerForm(forms.ModelForm):
@@ -181,9 +232,11 @@ class SaleForm(forms.ModelForm):
         elif not due_date:
             self.add_error("due_date", "Due date is required when sale status is Pending.")
 
+        cleaned_data = _normalize_form_date_fields(self, cleaned_data, ("date", "due_date"))
         return cleaned_data
 
     def __init__(self, *args, **kwargs):
+        self.calendar_mode = _resolve_form_calendar_mode(kwargs)
         super().__init__(*args, **kwargs)
         self.fields["invoice_number"].required = False
         self.fields["invoice_number"].widget.attrs["placeholder"] = "Leave blank to auto-generate"
@@ -197,6 +250,7 @@ class SaleForm(forms.ModelForm):
             self.initial["customer_input"] = self.instance.customer.name
         for field_name, field in self.fields.items():
             _decorate_widget(field_name, field)
+        _configure_form_date_fields(self, ("date", "due_date"))
 
 
 class TransactionForm(forms.ModelForm):
@@ -255,9 +309,11 @@ class TransactionForm(forms.ModelForm):
         else:
             cleaned_data["sale"] = None
 
+        cleaned_data = _normalize_form_date_fields(self, cleaned_data, ("date",))
         return cleaned_data
 
     def __init__(self, *args, **kwargs):
+        self.calendar_mode = _resolve_form_calendar_mode(kwargs)
         super().__init__(*args, **kwargs)
         self.fields["customer"].required = False
         self.fields["category"].required = False
@@ -280,6 +336,7 @@ class TransactionForm(forms.ModelForm):
                 self.initial["sale_input"] = self.instance.sale.invoice_number
         for field_name, field in self.fields.items():
             _decorate_widget(field_name, field)
+        _configure_form_date_fields(self, ("date",))
 
 
 class SaleReceiptForm(forms.ModelForm):
@@ -303,10 +360,16 @@ class SaleReceiptForm(forms.ModelForm):
             raise forms.ValidationError("Receipt amount must be greater than 0.")
         return amount
 
+    def clean(self):
+        cleaned_data = super().clean()
+        return _normalize_form_date_fields(self, cleaned_data, ("date",))
+
     def __init__(self, *args, **kwargs):
+        self.calendar_mode = _resolve_form_calendar_mode(kwargs)
         super().__init__(*args, **kwargs)
         for field_name, field in self.fields.items():
             _decorate_widget(field_name, field)
+        _configure_form_date_fields(self, ("date",))
 
 
 class JCBRecordForm(forms.ModelForm):
@@ -407,9 +470,10 @@ class JCBRecordForm(forms.ModelForm):
                 cleaned_data["total_amount"] = (worked * rate).quantize(Decimal("0.01"))
 
         cleaned_data["expense_item"] = expense_item
-        return cleaned_data
+        return _normalize_form_date_fields(self, cleaned_data, ("date",))
 
     def __init__(self, *args, **kwargs):
+        self.calendar_mode = _resolve_form_calendar_mode(kwargs)
         super().__init__(*args, **kwargs)
         self.fields["start_time"].required = False
         self.fields["end_time"].required = False
@@ -422,6 +486,7 @@ class JCBRecordForm(forms.ModelForm):
                 self.initial["total_amount"] = (worked * self.instance.rate).quantize(Decimal("0.01"))
         for field_name, field in self.fields.items():
             _decorate_widget(field_name, field)
+        _configure_form_date_fields(self, ("date",))
 
 
 class TipperRecordForm(forms.ModelForm):
@@ -446,10 +511,16 @@ class TipperRecordForm(forms.ModelForm):
             raise forms.ValidationError("Amount must be greater than 0.")
         return amount
 
+    def clean(self):
+        cleaned_data = super().clean()
+        return _normalize_form_date_fields(self, cleaned_data, ("date",))
+
     def __init__(self, *args, **kwargs):
+        self.calendar_mode = _resolve_form_calendar_mode(kwargs)
         super().__init__(*args, **kwargs)
         for field_name, field in self.fields.items():
             _decorate_widget(field_name, field)
+        _configure_form_date_fields(self, ("date",))
 
 
 class ManualAlertForm(forms.ModelForm):
@@ -469,6 +540,7 @@ class ManualAlertForm(forms.ModelForm):
 
     def clean(self):
         cleaned_data = super().clean()
+        cleaned_data = _normalize_form_date_fields(self, cleaned_data, ("due_date",))
         due_date = cleaned_data.get("due_date")
         title = cleaned_data.get("title")
 
@@ -508,6 +580,7 @@ class ManualAlertForm(forms.ModelForm):
         return alert
 
     def __init__(self, *args, **kwargs):
+        self.calendar_mode = _resolve_form_calendar_mode(kwargs)
         super().__init__(*args, **kwargs)
         self.fields["alert_type"].required = False
         self.fields["alert_type"].choices = [
@@ -516,6 +589,7 @@ class ManualAlertForm(forms.ModelForm):
         ]
         for field_name, field in self.fields.items():
             _decorate_widget(field_name, field)
+        _configure_form_date_fields(self, ("due_date",))
 
 
 class BlocksRecordForm(forms.ModelForm):
@@ -589,9 +663,10 @@ class BlocksRecordForm(forms.ModelForm):
             if price_per_unit is None or price_per_unit < 0:
                 self.add_error("price_per_unit", "Price per unit is required and must be greater than or equal to 0.")
         
-        return cleaned_data
+        return _normalize_form_date_fields(self, cleaned_data, ("date",))
 
     def __init__(self, *args, **kwargs):
+        self.calendar_mode = _resolve_form_calendar_mode(kwargs)
         super().__init__(*args, **kwargs)
         self.fields["sale_income"].required = False
         self.fields["sale_income"].disabled = True
@@ -618,6 +693,7 @@ class BlocksRecordForm(forms.ModelForm):
         
         for field_name, field in self.fields.items():
             _decorate_widget(field_name, field)
+        _configure_form_date_fields(self, ("date",))
 
 
 class CementRecordForm(forms.ModelForm):
@@ -686,9 +762,10 @@ class CementRecordForm(forms.ModelForm):
             if price_per_unit is None or price_per_unit < 0:
                 self.add_error("price_per_unit", "Price per unit is required and must be greater than or equal to 0.")
 
-        return cleaned_data
+        return _normalize_form_date_fields(self, cleaned_data, ("date",))
 
     def __init__(self, *args, **kwargs):
+        self.calendar_mode = _resolve_form_calendar_mode(kwargs)
         super().__init__(*args, **kwargs)
         self.fields["sale_income"].required = False
         self.fields["sale_income"].disabled = True
@@ -715,6 +792,7 @@ class CementRecordForm(forms.ModelForm):
 
         for field_name, field in self.fields.items():
             _decorate_widget(field_name, field)
+        _configure_form_date_fields(self, ("date",))
 
 
 class BambooRecordForm(forms.ModelForm):
@@ -777,9 +855,10 @@ class BambooRecordForm(forms.ModelForm):
             if price_per_unit is None or price_per_unit < 0:
                 self.add_error("price_per_unit", "Price per unit is required and must be greater than or equal to 0.")
 
-        return cleaned_data
+        return _normalize_form_date_fields(self, cleaned_data, ("date",))
 
     def __init__(self, *args, **kwargs):
+        self.calendar_mode = _resolve_form_calendar_mode(kwargs)
         super().__init__(*args, **kwargs)
         self.fields["sale_income"].required = False
         self.fields["sale_income"].disabled = True
@@ -805,3 +884,4 @@ class BambooRecordForm(forms.ModelForm):
 
         for field_name, field in self.fields.items():
             _decorate_widget(field_name, field)
+        _configure_form_date_fields(self, ("date",))

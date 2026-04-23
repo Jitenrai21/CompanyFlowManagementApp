@@ -21,7 +21,7 @@
                 <tbody>
                     {% for row in receipt_rows %}
                     <tr>
-                        <td>{{ row.receipt.date }}</td>
+                        <td>{{ row.receipt.date|calendar_date:request }}</td>
                         <td>{{ row.receipt.category }}</td>
                         <td>NPR {{ row.receipt.amount|npr_amount }}</td>
                         <td>NPR {{ row.running_balance|npr_amount }}</td>

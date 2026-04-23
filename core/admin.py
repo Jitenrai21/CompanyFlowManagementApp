@@ -1,4 +1,7 @@
-from django.contrib import admin
+from django.contrib import admin, messages
+
+from .bs_date_utils import parse_calendar_date_input
+from .calendar_mode import CALENDAR_MODE_BS, get_calendar_mode
 
 from .models import (
     AlertNotification,
@@ -30,6 +33,42 @@ class TransactionCategoryAdmin(admin.ModelAdmin):
     ordering = ("name",)
 
 
+class CalendarAwareAdminMixin:
+    date_filter_fields: tuple[str, ...] = ()
+
+    def _calendar_normalized_get(self, request):
+        if get_calendar_mode(request) != CALENDAR_MODE_BS:
+            return
+
+        updated_get = request.GET.copy()
+        changed = False
+
+        for field_name in self.date_filter_fields:
+            prefixes = (f"{field_name}", f"{field_name}__")
+            for key in list(updated_get.keys()):
+                if not key.startswith(prefixes):
+                    continue
+
+                raw_value = (updated_get.get(key) or "").strip()
+                if not raw_value:
+                    continue
+
+                parsed_date, parse_error = parse_calendar_date_input(raw_value, CALENDAR_MODE_BS)
+                if parse_error:
+                    messages.error(request, f"Admin filter {key}: {parse_error}")
+                    continue
+                if parsed_date:
+                    updated_get[key] = parsed_date.isoformat()
+                    changed = True
+
+        if changed:
+            request.GET = updated_get
+
+    def changelist_view(self, request, extra_context=None):
+        self._calendar_normalized_get(request)
+        return super().changelist_view(request, extra_context=extra_context)
+
+
 @admin.register(Customer)
 class CustomerAdmin(admin.ModelAdmin):
     list_display = (
@@ -52,7 +91,8 @@ class CustomerAdmin(admin.ModelAdmin):
 
 
 @admin.register(Transaction)
-class TransactionAdmin(admin.ModelAdmin):
+class TransactionAdmin(CalendarAwareAdminMixin, admin.ModelAdmin):
+    date_filter_fields = ("date",)
     list_display = (
         "date",
         "customer",
@@ -78,7 +118,8 @@ class TransactionAdmin(admin.ModelAdmin):
 
 
 @admin.register(Sale)
-class SaleAdmin(admin.ModelAdmin):
+class SaleAdmin(CalendarAwareAdminMixin, admin.ModelAdmin):
+    date_filter_fields = ("date", "due_date")
     list_display = (
         "invoice_number",
         "date",
@@ -97,7 +138,8 @@ class SaleAdmin(admin.ModelAdmin):
 
 
 @admin.register(AlertNotification)
-class AlertNotificationAdmin(admin.ModelAdmin):
+class AlertNotificationAdmin(CalendarAwareAdminMixin, admin.ModelAdmin):
+    date_filter_fields = ("due_date",)
     list_display = (
         "alert_type",
         "source_type",
@@ -114,7 +156,8 @@ class AlertNotificationAdmin(admin.ModelAdmin):
 
 
 @admin.register(CustomerPayment)
-class CustomerPaymentAdmin(admin.ModelAdmin):
+class CustomerPaymentAdmin(CalendarAwareAdminMixin, admin.ModelAdmin):
+    date_filter_fields = ("payment_date",)
     list_display = (
         "payment_date",
         "customer",
@@ -138,7 +181,8 @@ class PaymentAllocationAdmin(admin.ModelAdmin):
 
 
 @admin.register(JCBRecord)
-class JCBRecordAdmin(admin.ModelAdmin):
+class JCBRecordAdmin(CalendarAwareAdminMixin, admin.ModelAdmin):
+    date_filter_fields = ("date",)
     list_display = (
         "date",
         "site_name",
@@ -165,7 +209,8 @@ class TipperItemAdmin(admin.ModelAdmin):
 
 
 @admin.register(TipperRecord)
-class TipperRecordAdmin(admin.ModelAdmin):
+class TipperRecordAdmin(CalendarAwareAdminMixin, admin.ModelAdmin):
+    date_filter_fields = ("date",)
     list_display = ("date", "item", "record_type", "description", "amount")
     list_filter = ("record_type", "item", "date")
     search_fields = ("item__name", "description")
@@ -175,7 +220,8 @@ class TipperRecordAdmin(admin.ModelAdmin):
 
 
 @admin.register(BlocksRecord)
-class BlocksRecordAdmin(admin.ModelAdmin):
+class BlocksRecordAdmin(CalendarAwareAdminMixin, admin.ModelAdmin):
+    date_filter_fields = ("date",)
     list_display = (
         "date",
         "record_type",
@@ -197,7 +243,8 @@ class BlocksRecordAdmin(admin.ModelAdmin):
 
 
 @admin.register(CementRecord)
-class CementRecordAdmin(admin.ModelAdmin):
+class CementRecordAdmin(CalendarAwareAdminMixin, admin.ModelAdmin):
+    date_filter_fields = ("date",)
     list_display = (
         "date",
         "record_type",
@@ -219,7 +266,8 @@ class CementRecordAdmin(admin.ModelAdmin):
 
 
 @admin.register(BambooRecord)
-class BambooRecordAdmin(admin.ModelAdmin):
+class BambooRecordAdmin(CalendarAwareAdminMixin, admin.ModelAdmin):
+    date_filter_fields = ("date",)
     list_display = (
         "date",
         "record_type",

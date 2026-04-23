@@ -4,6 +4,8 @@ from django.utils import timezone
 from datetime import timedelta
 from decimal import Decimal, InvalidOperation
 
+from .bs_date_utils import ad_to_bs_string
+
 
 class TimeStampedModel(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
@@ -72,6 +74,7 @@ class Customer(TimeStampedModel):
 
 class Transaction(TimeStampedModel):
     date = models.DateField(default=timezone.now)
+    bs_date = models.CharField(max_length=10, blank=True, null=True, db_index=True)
     amount = models.DecimalField(max_digits=14, decimal_places=2)
     type = models.CharField(max_length=10, choices=TransactionType.choices)
     payment_method = models.CharField(
@@ -148,9 +151,14 @@ class Transaction(TimeStampedModel):
     def __str__(self) -> str:
         return f"{self.get_type_display()} - {self.amount} ({self.date})"
 
+    def save(self, *args, **kwargs):
+        self.bs_date = ad_to_bs_string(self.date)
+        super().save(*args, **kwargs)
+
 class Sale(TimeStampedModel):
     invoice_number = models.CharField(max_length=40, unique=True)
     date = models.DateField(default=timezone.now)
+    bs_date = models.CharField(max_length=10, blank=True, null=True, db_index=True)
     customer = models.ForeignKey(
         Customer,
         on_delete=models.SET_NULL,
@@ -162,6 +170,7 @@ class Sale(TimeStampedModel):
     notes = models.TextField(blank=True)
     total_amount = models.DecimalField(max_digits=14, decimal_places=2)
     due_date = models.DateField(blank=True, null=True)
+    bs_due_date = models.CharField(max_length=10, blank=True, null=True, db_index=True)
     paid_amount = models.DecimalField(max_digits=14, decimal_places=2, default=0)
     status = models.CharField(
         max_length=10,
@@ -180,6 +189,11 @@ class Sale(TimeStampedModel):
 
     def __str__(self) -> str:
         return self.invoice_number
+
+    def save(self, *args, **kwargs):
+        self.bs_date = ad_to_bs_string(self.date)
+        self.bs_due_date = ad_to_bs_string(self.due_date)
+        super().save(*args, **kwargs)
 
     @property
     def total_received(self):
@@ -214,6 +228,7 @@ class Sale(TimeStampedModel):
 
 class JCBRecord(TimeStampedModel):
     date = models.DateField(default=timezone.now)
+    bs_date = models.CharField(max_length=10, blank=True, null=True, db_index=True)
     site_name = models.CharField(max_length=120, blank=True, null=True)
     start_time = models.DecimalField(max_digits=7, decimal_places=2, default=Decimal("0.00"))
     end_time = models.DecimalField(max_digits=7, decimal_places=2, default=Decimal("0.00"))
@@ -257,6 +272,7 @@ class JCBRecord(TimeStampedModel):
         self.total_work_hours = worked.quantize(Decimal("0.01"))
         if self.total_amount is None:
             self.total_amount = (self.total_work_hours * self.rate).quantize(Decimal("0.01"))
+        self.bs_date = ad_to_bs_string(self.date)
         super().save(*args, **kwargs)
 
 
@@ -277,6 +293,7 @@ class TipperItem(models.Model):
 
 class TipperRecord(TimeStampedModel):
     date = models.DateField(default=timezone.now)
+    bs_date = models.CharField(max_length=10, blank=True, null=True, db_index=True)
     item = models.ForeignKey(
         TipperItem,
         on_delete=models.CASCADE,
@@ -296,6 +313,10 @@ class TipperRecord(TimeStampedModel):
 
     def __str__(self) -> str:
         return f"{self.get_record_type_display()} - {self.item.name} ({self.amount})"
+
+    def save(self, *args, **kwargs):
+        self.bs_date = ad_to_bs_string(self.date)
+        super().save(*args, **kwargs)
 
 
 class AlertType(models.TextChoices):
@@ -322,6 +343,7 @@ class AlertNotification(TimeStampedModel):
         null=True,
     )
     due_date = models.DateField()
+    bs_due_date = models.CharField(max_length=10, blank=True, null=True, db_index=True)
     amount = models.DecimalField(max_digits=14, decimal_places=2)
     title = models.CharField(max_length=180)
     message = models.TextField(blank=True)
@@ -354,6 +376,10 @@ class AlertNotification(TimeStampedModel):
         source_id = self.source_id if self.source_id is not None else "-"
         return f"{self.get_alert_type_display()} {self.get_source_type_display()} #{source_id}"
 
+    def save(self, *args, **kwargs):
+        self.bs_due_date = ad_to_bs_string(self.due_date)
+        super().save(*args, **kwargs)
+
 
 class CustomerPayment(TimeStampedModel):
     customer = models.ForeignKey(
@@ -362,6 +388,7 @@ class CustomerPayment(TimeStampedModel):
         related_name="customer_payments",
     )
     payment_date = models.DateField(default=timezone.now)
+    bs_payment_date = models.CharField(max_length=10, blank=True, null=True, db_index=True)
     amount = models.DecimalField(max_digits=14, decimal_places=2)
     payment_method = models.CharField(
         max_length=20,
@@ -380,6 +407,10 @@ class CustomerPayment(TimeStampedModel):
 
     def __str__(self) -> str:
         return f"Payment {self.customer.name} {self.amount} on {self.payment_date}"
+
+    def save(self, *args, **kwargs):
+        self.bs_payment_date = ad_to_bs_string(self.payment_date)
+        super().save(*args, **kwargs)
 
 
 class PaymentAllocation(TimeStampedModel):
@@ -427,6 +458,7 @@ class BlocksUnitType(models.TextChoices):
 class BlocksRecord(TimeStampedModel):
     """Model for managing inventory and investment/sales records for production blocks."""
     date = models.DateField(default=timezone.now)
+    bs_date = models.CharField(max_length=10, blank=True, null=True, db_index=True)
     record_type = models.CharField(
         max_length=20,
         choices=BlocksRecordType.choices,
@@ -513,6 +545,8 @@ class BlocksRecord(TimeStampedModel):
                 self.sale_income = (quantity_decimal * price_decimal).quantize(Decimal("0.01"))
             else:
                 self.sale_income = None
+
+        self.bs_date = ad_to_bs_string(self.date)
         
         super().save(*args, **kwargs)
     
@@ -551,6 +585,7 @@ class CementUnitType(models.TextChoices):
 class CementRecord(TimeStampedModel):
     """Model for managing inventory and investment/sales records for cement."""
     date = models.DateField(default=timezone.now)
+    bs_date = models.CharField(max_length=10, blank=True, null=True, db_index=True)
     record_type = models.CharField(
         max_length=20,
         choices=CementRecordType.choices,
@@ -636,6 +671,8 @@ class CementRecord(TimeStampedModel):
             else:
                 self.sale_income = None
 
+        self.bs_date = ad_to_bs_string(self.date)
+
         super().save(*args, **kwargs)
 
     @property
@@ -664,6 +701,7 @@ class BambooRecordType(models.TextChoices):
 class BambooRecord(TimeStampedModel):
     """Model for managing inventory and investment/sales records for bamboo."""
     date = models.DateField(default=timezone.now)
+    bs_date = models.CharField(max_length=10, blank=True, null=True, db_index=True)
     record_type = models.CharField(
         max_length=20,
         choices=BambooRecordType.choices,
@@ -740,6 +778,8 @@ class BambooRecord(TimeStampedModel):
                 self.sale_income = (quantity_decimal * price_decimal).quantize(Decimal("0.01"))
             else:
                 self.sale_income = None
+
+        self.bs_date = ad_to_bs_string(self.date)
 
         super().save(*args, **kwargs)
 

@@ -26,6 +26,12 @@ from .forms import (
 	TipperRecordForm,
 	TransactionForm,
 )
+from .calendar_mode import (
+	CALENDAR_MODE_SESSION_KEY,
+	get_calendar_mode,
+	normalize_calendar_mode,
+)
+from .bs_date_utils import ad_string_to_date, date_to_calendar_input, parse_calendar_date_input, resolve_ad_date_filters
 from .models import (
 	AlertNotification,
 	AlertSource,
@@ -125,6 +131,50 @@ def _get_default_date_range():
 	default_from = (today - datetime.timedelta(days=29)).isoformat()
 	default_to = today.isoformat()
 	return default_from, default_to
+
+
+def _resolve_request_date_filters(request, *, default_from="", default_to=""):
+	calendar_mode = get_calendar_mode(request)
+	parse_errors = []
+	date_from, date_to = resolve_ad_date_filters(
+		request.GET,
+		default_from=default_from,
+		default_to=default_to,
+		calendar_mode=calendar_mode,
+		errors=parse_errors,
+	)
+	for parse_error in parse_errors:
+		messages.error(request, parse_error)
+
+	return {
+		"date_from": date_from,
+		"date_to": date_to,
+		"date_from_display": date_to_calendar_input(ad_string_to_date(date_from), calendar_mode) if date_from else "",
+		"date_to_display": date_to_calendar_input(ad_string_to_date(date_to), calendar_mode) if date_to else "",
+	}
+
+
+def _form_calendar_mode_kwargs(request):
+	return {"calendar_mode": get_calendar_mode(request)}
+
+
+def _resolve_posted_date(request, raw_value, *, fallback=None):
+	fallback_date = fallback or timezone.localdate()
+	date_value, parse_error = parse_calendar_date_input(raw_value, get_calendar_mode(request))
+	if parse_error:
+		messages.error(request, parse_error)
+		return fallback_date
+	return date_value or fallback_date
+
+
+@login_required
+def set_calendar_mode(request, mode):
+	next_url = request.GET.get("next", "").strip()
+	request.session[CALENDAR_MODE_SESSION_KEY] = normalize_calendar_mode(mode)
+
+	if next_url and url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}):
+		return redirect(next_url)
+	return redirect("dashboard")
 
 
 def _dashboard_base_sales_queryset(date_from="", date_to=""):
@@ -1071,7 +1121,7 @@ def _sync_tipper_expense_transaction(tipper_record):
 		expense_qs.delete()
 
 
-def _sale_receipt_context(sale, form=None):
+def _sale_receipt_context(sale, request, form=None):
 	receipts = sale.receipts.filter(type=TransactionType.INCOME).order_by("date", "created_at")
 	receipt_rows = []
 	running_received = Decimal("0.00")
@@ -1094,14 +1144,14 @@ def _sale_receipt_context(sale, form=None):
 		"sale": sale,
 		"can_add_receipts": bool(sale.customer_id),
 		"receipt_rows": receipt_rows,
-		"receipt_form": form or SaleReceiptForm(),
+		"receipt_form": form or SaleReceiptForm(**_form_calendar_mode_kwargs(request)),
 		"total_received": effective_received,
 		"remaining_balance": remaining_balance,
 		"sale_status": sale.status,
 	}
 
 
-def _customer_payment_context(customer):
+def _customer_payment_context(customer, request):
 	sales = customer.sales.all().order_by("-date", "-created_at")
 	pending_sales = (
 		customer.sales.filter(status=RecordStatus.PENDING)
@@ -1148,17 +1198,26 @@ def _customer_payment_context(customer):
 		"manual_due_amount": customer.manual_due_amount,
 		"payment_method_choices": PaymentMethod.choices,
 		"today": timezone.localdate(),
+		"payment_date_value": date_to_calendar_input(timezone.localdate(), get_calendar_mode(request)),
 	}
 
 
 @login_required
 def dashboard(request):
 	default_from, default_to = _get_default_date_range()
-	date_from = request.GET.get("date_from", "").strip() or default_from
-	date_to = request.GET.get("date_to", "").strip() or default_to
+	date_filters = _resolve_request_date_filters(
+		request,
+		default_from=default_from,
+		default_to=default_to,
+	)
+	date_from = date_filters["date_from"]
+	date_to = date_filters["date_to"]
 	context = _dashboard_context(date_from=date_from, date_to=date_to)
 	# Pass filters for template default values
-	context["filters"] = {"date_from": date_from, "date_to": date_to}
+	context["filters"] = {
+		"date_from": date_filters["date_from_display"],
+		"date_to": date_filters["date_to_display"],
+	}
 
 	if request.headers.get("HX-Request"):
 		return render(request, "core/partials/dashboard_content.html", context)
@@ -1196,8 +1255,13 @@ def cash_entries(request):
 	)
 
 	query = request.GET.get("q", "").strip()
-	date_from = request.GET.get("date_from", "").strip() or default_from
-	date_to = request.GET.get("date_to", "").strip() or default_to
+	date_filters = _resolve_request_date_filters(
+		request,
+		default_from=default_from,
+		default_to=default_to,
+	)
+	date_from = date_filters["date_from"]
+	date_to = date_filters["date_to"]
 	transaction_type = request.GET.get("type", "").strip()
 	payment_method = request.GET.get("payment_method", "").strip()
 	category_id = request.GET.get("category", "").strip()
@@ -1240,8 +1304,8 @@ def cash_entries(request):
 		"categories": TransactionCategory.objects.all().order_by("name"),
 		"filters": {
 			"q": query,
-			"date_from": date_from,
-			"date_to": date_to,
+			"date_from": date_filters["date_from_display"],
+			"date_to": date_filters["date_to_display"],
 			"type": transaction_type,
 			"payment_method": payment_method,
 			"category": category_id,
@@ -1270,7 +1334,7 @@ def transaction_detail(request, pk):
 @login_required
 def transaction_create(request):
 	if request.method == "POST":
-		form = TransactionForm(request.POST, request.FILES)
+		form = TransactionForm(request.POST, request.FILES, **_form_calendar_mode_kwargs(request))
 		if form.is_valid():
 			customer = form.cleaned_data.get("customer")
 			transaction_type = form.cleaned_data.get("type")
@@ -1312,7 +1376,7 @@ def transaction_create(request):
 			return redirect("cash_entries")
 		messages.error(request, "Please fix the errors below.")
 	else:
-		form = TransactionForm()
+		form = TransactionForm(**_form_calendar_mode_kwargs(request))
 
 	return render(
 		request,
@@ -1332,7 +1396,7 @@ def transaction_edit(request, pk):
 	original_sale_id = transaction.sale_id
 
 	if request.method == "POST":
-		form = TransactionForm(request.POST, request.FILES, instance=transaction)
+		form = TransactionForm(request.POST, request.FILES, instance=transaction, **_form_calendar_mode_kwargs(request))
 		if form.is_valid():
 			updated_transaction = form.save()
 			sale_ids_to_sync = {sale_id for sale_id in [original_sale_id, updated_transaction.sale_id] if sale_id}
@@ -1344,7 +1408,7 @@ def transaction_edit(request, pk):
 			return redirect("cash_entries")
 		messages.error(request, "Please fix the errors below.")
 	else:
-		form = TransactionForm(instance=transaction)
+		form = TransactionForm(instance=transaction, **_form_calendar_mode_kwargs(request))
 
 	return render(
 		request,
@@ -1407,8 +1471,13 @@ def jcb_records(request):
 
 	query = request.GET.get("q", "").strip()
 	status = request.GET.get("status", "").strip()
-	date_from = request.GET.get("date_from", "").strip() or default_from
-	date_to = request.GET.get("date_to", "").strip() or default_to
+	date_filters = _resolve_request_date_filters(
+		request,
+		default_from=default_from,
+		default_to=default_to,
+	)
+	date_from = date_filters["date_from"]
+	date_to = date_filters["date_to"]
 	sort = request.GET.get("sort", "-date")
 
 	if query:
@@ -1448,8 +1517,8 @@ def jcb_records(request):
 		"filters": {
 			"q": query,
 			"status": status,
-			"date_from": date_from,
-			"date_to": date_to,
+			"date_from": date_filters["date_from_display"],
+			"date_to": date_filters["date_to_display"],
 			"sort": sort,
 		},
 	}
@@ -1462,7 +1531,7 @@ def jcb_records(request):
 @login_required
 def jcb_record_create(request):
 	if request.method == "POST":
-		form = JCBRecordForm(request.POST)
+		form = JCBRecordForm(request.POST, **_form_calendar_mode_kwargs(request))
 		if form.is_valid():
 			jcb_record = form.save()
 			_sync_jcb_transactions(jcb_record)
@@ -1470,7 +1539,7 @@ def jcb_record_create(request):
 			return redirect("jcb_records")
 		messages.error(request, "Please fix the errors below.")
 	else:
-		form = JCBRecordForm()
+		form = JCBRecordForm(**_form_calendar_mode_kwargs(request))
 
 	return render(
 		request,
@@ -1488,7 +1557,7 @@ def jcb_record_edit(request, pk):
 	jcb_record = get_object_or_404(JCBRecord, pk=pk)
 
 	if request.method == "POST":
-		form = JCBRecordForm(request.POST, instance=jcb_record)
+		form = JCBRecordForm(request.POST, instance=jcb_record, **_form_calendar_mode_kwargs(request))
 		if form.is_valid():
 			jcb_record = form.save()
 			_sync_jcb_transactions(jcb_record)
@@ -1496,7 +1565,7 @@ def jcb_record_edit(request, pk):
 			return redirect("jcb_records")
 		messages.error(request, "Please fix the errors below.")
 	else:
-		form = JCBRecordForm(instance=jcb_record)
+		form = JCBRecordForm(instance=jcb_record, **_form_calendar_mode_kwargs(request))
 
 	return render(
 		request,
@@ -1569,8 +1638,13 @@ def tipper_records(request):
 	queryset = TipperRecord.objects.select_related("item").all()
 
 	query = request.GET.get("q", "").strip()
-	date_from = request.GET.get("date_from", "").strip() or default_from
-	date_to = request.GET.get("date_to", "").strip() or default_to
+	date_filters = _resolve_request_date_filters(
+		request,
+		default_from=default_from,
+		default_to=default_to,
+	)
+	date_from = date_filters["date_from"]
+	date_to = date_filters["date_to"]
 	record_type = request.GET.get("record_type", "").strip()
 	item_id = request.GET.get("item", "").strip()
 	sort = request.GET.get("sort", "-date")
@@ -1606,8 +1680,8 @@ def tipper_records(request):
 		"record_type_choices": TipperRecordType.choices,
 		"filters": {
 			"q": query,
-			"date_from": date_from,
-			"date_to": date_to,
+			"date_from": date_filters["date_from_display"],
+			"date_to": date_filters["date_to_display"],
 			"record_type": record_type,
 			"item": item_id,
 			"sort": sort,
@@ -1628,7 +1702,7 @@ def tipper_record_detail(request, pk):
 @login_required
 def tipper_record_create(request):
 	if request.method == "POST":
-		form = TipperRecordForm(request.POST)
+		form = TipperRecordForm(request.POST, **_form_calendar_mode_kwargs(request))
 		if form.is_valid():
 			with db_transaction.atomic():
 				tipper_record = form.save()
@@ -1637,7 +1711,7 @@ def tipper_record_create(request):
 			return redirect("tipper_records")
 		messages.error(request, "Please fix the errors below.")
 	else:
-		form = TipperRecordForm()
+		form = TipperRecordForm(**_form_calendar_mode_kwargs(request))
 
 	return render(
 		request,
@@ -1655,7 +1729,7 @@ def tipper_record_edit(request, pk):
 	tipper_record = get_object_or_404(TipperRecord, pk=pk)
 
 	if request.method == "POST":
-		form = TipperRecordForm(request.POST, instance=tipper_record)
+		form = TipperRecordForm(request.POST, instance=tipper_record, **_form_calendar_mode_kwargs(request))
 		if form.is_valid():
 			with db_transaction.atomic():
 				tipper_record = form.save()
@@ -1664,7 +1738,7 @@ def tipper_record_edit(request, pk):
 			return redirect("tipper_records")
 		messages.error(request, "Please fix the errors below.")
 	else:
-		form = TipperRecordForm(instance=tipper_record)
+		form = TipperRecordForm(instance=tipper_record, **_form_calendar_mode_kwargs(request))
 
 	return render(
 		request,
@@ -1730,8 +1804,13 @@ def sales(request):
 	query = request.GET.get("q", "").strip()
 	status = request.GET.get("status", "").strip()
 	customer_id = request.GET.get("customer", "").strip()
-	date_from = request.GET.get("date_from", "").strip() or default_from
-	date_to = request.GET.get("date_to", "").strip() or default_to
+	date_filters = _resolve_request_date_filters(
+		request,
+		default_from=default_from,
+		default_to=default_to,
+	)
+	date_from = date_filters["date_from"]
+	date_to = date_filters["date_to"]
 	sort = request.GET.get("sort", "-date")
 
 	if query:
@@ -1770,8 +1849,8 @@ def sales(request):
 			"q": query,
 			"status": status,
 			"customer": customer_id,
-			"date_from": date_from,
-			"date_to": date_to,
+			"date_from": date_filters["date_from_display"],
+			"date_to": date_filters["date_to_display"],
 			"sort": sort,
 		},
 	}
@@ -1783,7 +1862,7 @@ def sales(request):
 @login_required
 def sale_create(request):
 	if request.method == "POST":
-		form = SaleForm(request.POST)
+		form = SaleForm(request.POST, **_form_calendar_mode_kwargs(request))
 		if form.is_valid():
 			sale = form.save(commit=False)
 			sale.paid_amount = sale.total_amount if sale.status == RecordStatus.PAID else Decimal("0.00")
@@ -1798,7 +1877,7 @@ def sale_create(request):
 			return redirect("sale_detail", pk=sale.pk)
 		messages.error(request, "Please fix the errors below.")
 	else:
-		form = SaleForm()
+		form = SaleForm(**_form_calendar_mode_kwargs(request))
 
 	return render(
 		request,
@@ -1817,7 +1896,7 @@ def sale_edit(request, pk):
 	sale = get_object_or_404(Sale, pk=pk)
 
 	if request.method == "POST":
-		form = SaleForm(request.POST, instance=sale)
+		form = SaleForm(request.POST, instance=sale, **_form_calendar_mode_kwargs(request))
 		if form.is_valid():
 			sale = form.save(commit=False)
 			if sale.status == RecordStatus.PAID:
@@ -1832,7 +1911,7 @@ def sale_edit(request, pk):
 			return redirect("sale_detail", pk=sale.pk)
 		messages.error(request, "Please fix the errors below.")
 	else:
-		form = SaleForm(instance=sale)
+		form = SaleForm(instance=sale, **_form_calendar_mode_kwargs(request))
 
 	return render(
 		request,
@@ -1850,7 +1929,7 @@ def sale_edit(request, pk):
 @login_required
 def sale_detail(request, pk):
 	sale = get_object_or_404(Sale.objects.select_related("customer"), pk=pk)
-	context = _sale_receipt_context(sale)
+	context = _sale_receipt_context(sale, request)
 	return render(request, "core/sale_detail.html", context)
 
 
@@ -1954,12 +2033,12 @@ def sale_receipt_create(request, pk):
 
 	if not sale.customer_id:
 		messages.error(request, "Assign a customer to this sale before adding receipts.")
-		context = _sale_receipt_context(sale)
+		context = _sale_receipt_context(sale, request)
 		if request.headers.get("HX-Request"):
 			return render(request, "core/partials/sale_receipts_panel.html", context, status=400)
 		return render(request, "core/sale_detail.html", context, status=400)
 
-	form = SaleReceiptForm(request.POST)
+	form = SaleReceiptForm(request.POST, **_form_calendar_mode_kwargs(request))
 	if form.is_valid():
 		receipt = form.save(commit=False)
 		receipt.type = TransactionType.INCOME
@@ -1972,13 +2051,13 @@ def sale_receipt_create(request, pk):
 		messages.success(request, "Cash receipt added to sale.")
 
 		if request.headers.get("HX-Request"):
-			context = _sale_receipt_context(sale)
+			context = _sale_receipt_context(sale, request)
 			context["inline_success"] = "Cash receipt added to sale."
 			return render(request, "core/partials/sale_receipts_panel.html", context)
 		return redirect("sale_detail", pk=sale.pk)
 
 	messages.error(request, "Please fix the receipt form errors.")
-	context = _sale_receipt_context(sale, form=form)
+	context = _sale_receipt_context(sale, request, form=form)
 	if request.headers.get("HX-Request"):
 		return render(request, "core/partials/sale_receipts_panel.html", context, status=400)
 	return render(request, "core/sale_detail.html", context, status=400)
@@ -2045,7 +2124,7 @@ def customer_detail(request, pk):
 		"customer": customer,
 		"transactions": transactions,
 	}
-	context.update(_customer_payment_context(customer))
+	context.update(_customer_payment_context(customer, request))
 	return render(request, "core/customer_detail.html", context)
 
 
@@ -2074,7 +2153,7 @@ def customer_allocate_payment(request, pk):
 		message = "Enter a valid payment amount greater than zero."
 		if request.headers.get("HX-Request"):
 			context = {"customer": customer, "allocation_error": message}
-			context.update(_customer_payment_context(customer))
+			context.update(_customer_payment_context(customer, request))
 			return render(request, "core/partials/customer_payment_section.html", context)
 		messages.error(request, message)
 		return redirect("customer_detail", pk=customer.pk)
@@ -2083,7 +2162,7 @@ def customer_allocate_payment(request, pk):
 		message = "No available credit balance to allocate."
 		if request.headers.get("HX-Request"):
 			context = {"customer": customer, "allocation_error": message}
-			context.update(_customer_payment_context(customer))
+			context.update(_customer_payment_context(customer, request))
 			return render(request, "core/partials/customer_payment_section.html", context)
 		messages.error(request, message)
 		return redirect("customer_detail", pk=customer.pk)
@@ -2092,7 +2171,7 @@ def customer_allocate_payment(request, pk):
 		message = "Select at least one pending sale or manual due to allocate payment."
 		if request.headers.get("HX-Request"):
 			context = {"customer": customer, "allocation_error": message}
-			context.update(_customer_payment_context(customer))
+			context.update(_customer_payment_context(customer, request))
 			return render(request, "core/partials/customer_payment_section.html", context)
 		messages.error(request, message)
 		return redirect("customer_detail", pk=customer.pk)
@@ -2103,12 +2182,7 @@ def customer_allocate_payment(request, pk):
 	if payment_method not in dict(PaymentMethod.choices):
 		payment_method = PaymentMethod.CASH
 
-	payment_date = timezone.localdate()
-	if raw_date:
-		try:
-			payment_date = timezone.datetime.strptime(raw_date, "%Y-%m-%d").date()
-		except ValueError:
-			payment_date = timezone.localdate()
+	payment_date = _resolve_posted_date(request, raw_date, fallback=timezone.localdate())
 
 	with db_transaction.atomic():
 		customer = Customer.objects.select_for_update().get(pk=customer.pk)
@@ -2122,7 +2196,7 @@ def customer_allocate_payment(request, pk):
 			message = "No eligible pending sales or manual due found for allocation."
 			if request.headers.get("HX-Request"):
 				context = {"customer": customer, "allocation_error": message}
-				context.update(_customer_payment_context(customer))
+				context.update(_customer_payment_context(customer, request))
 				return render(request, "core/partials/customer_payment_section.html", context)
 			messages.error(request, message)
 			return redirect("customer_detail", pk=customer.pk)
@@ -2269,7 +2343,7 @@ def customer_allocate_payment(request, pk):
 			"customer": customer,
 			"allocation_success": summary_text,
 		}
-		context.update(_customer_payment_context(customer))
+		context.update(_customer_payment_context(customer, request))
 		return render(request, "core/partials/customer_payment_section.html", context)
 
 	messages.success(request, summary_text)
@@ -2361,11 +2435,14 @@ def customer_delete(request, pk):
 def alerts(request):
 	alert_type = request.GET.get("type", "").strip()
 	customer_id = request.GET.get("customer", "").strip()
-	date_from = request.GET.get("date_from", "").strip()
-	date_to = request.GET.get("date_to", "").strip()
+	date_filters = _resolve_request_date_filters(request)
+	date_from = date_filters["date_from"]
+	date_to = date_filters["date_to"]
 
 	AlertNotification.objects.filter(is_active=True, is_read=False).update(is_read=True)
 	context = _alerts_context(alert_type, customer_id, date_from, date_to)
+	context["filters"]["date_from"] = date_filters["date_from_display"]
+	context["filters"]["date_to"] = date_filters["date_to_display"]
 
 	if request.headers.get("HX-Request"):
 		context["include_badge_oob"] = True
@@ -2397,9 +2474,12 @@ def alert_notification_resolve(request, pk):
 
 	alert_type = request.GET.get("type", "").strip()
 	customer_id = request.GET.get("customer", "").strip()
-	date_from = request.GET.get("date_from", "").strip()
-	date_to = request.GET.get("date_to", "").strip()
+	date_filters = _resolve_request_date_filters(request)
+	date_from = date_filters["date_from"]
+	date_to = date_filters["date_to"]
 	context = _alerts_context(alert_type, customer_id, date_from, date_to)
+	context["filters"]["date_from"] = date_filters["date_from_display"]
+	context["filters"]["date_to"] = date_filters["date_to_display"]
 
 	if request.headers.get("HX-Request"):
 		context["include_badge_oob"] = True
@@ -2410,14 +2490,14 @@ def alert_notification_resolve(request, pk):
 @login_required
 def manual_alert_create(request):
 	if request.method == "POST":
-		form = ManualAlertForm(request.POST)
+		form = ManualAlertForm(request.POST, **_form_calendar_mode_kwargs(request))
 		if form.is_valid():
 			form.save()
 			messages.success(request, "Manual alert created successfully.")
 			return redirect("alerts")
 		messages.error(request, "Please fix the errors below.")
 	else:
-		form = ManualAlertForm(initial={"due_date": timezone.localdate()})
+		form = ManualAlertForm(initial={"due_date": timezone.localdate()}, **_form_calendar_mode_kwargs(request))
 
 	return render(
 		request,
@@ -2438,14 +2518,14 @@ def manual_alert_edit(request, pk):
 		return redirect("alerts")
 
 	if request.method == "POST":
-		form = ManualAlertForm(request.POST, instance=manual_alert)
+		form = ManualAlertForm(request.POST, instance=manual_alert, **_form_calendar_mode_kwargs(request))
 		if form.is_valid():
 			form.save()
 			messages.success(request, "Manual alert updated successfully.")
 			return redirect("alerts")
 		messages.error(request, "Please fix the errors below.")
 	else:
-		form = ManualAlertForm(instance=manual_alert)
+		form = ManualAlertForm(instance=manual_alert, **_form_calendar_mode_kwargs(request))
 
 	return render(
 		request,
@@ -2485,8 +2565,13 @@ def blocks_records(request):
 	record_type = request.GET.get("record_type", "").strip()
 	payment_status = request.GET.get("payment_status", "").strip()
 	unit_type = request.GET.get("unit_type", "").strip()
-	date_from = request.GET.get("date_from", "").strip() or default_from
-	date_to = request.GET.get("date_to", "").strip() or default_to
+	date_filters = _resolve_request_date_filters(
+		request,
+		default_from=default_from,
+		default_to=default_to,
+	)
+	date_from = date_filters["date_from"]
+	date_to = date_filters["date_to"]
 	sort = request.GET.get("sort", "-date")
 
 	if query:
@@ -2527,8 +2612,8 @@ def blocks_records(request):
 			"record_type": record_type,
 			"payment_status": payment_status,
 			"unit_type": unit_type,
-			"date_from": date_from,
-			"date_to": date_to,
+			"date_from": date_filters["date_from_display"],
+			"date_to": date_filters["date_to_display"],
 			"sort": sort,
 		},
 		"record_type_choices": BlocksRecordType.choices,
@@ -2546,7 +2631,7 @@ def blocks_records(request):
 def blocks_record_create(request):
 	"""Create a new blocks record."""
 	if request.method == "POST":
-		form = BlocksRecordForm(request.POST)
+		form = BlocksRecordForm(request.POST, **_form_calendar_mode_kwargs(request))
 		if form.is_valid():
 			blocks_record = form.save()
 			
@@ -2558,7 +2643,7 @@ def blocks_record_create(request):
 			return redirect("blocks_records")
 		messages.error(request, "Please fix the errors below.")
 	else:
-		form = BlocksRecordForm(initial={"date": timezone.localdate()})
+		form = BlocksRecordForm(initial={"date": timezone.localdate()}, **_form_calendar_mode_kwargs(request))
 
 	return render(
 		request,
@@ -2577,7 +2662,7 @@ def blocks_record_edit(request, pk):
 	blocks_record = get_object_or_404(BlocksRecord, pk=pk)
 
 	if request.method == "POST":
-		form = BlocksRecordForm(request.POST, instance=blocks_record)
+		form = BlocksRecordForm(request.POST, instance=blocks_record, **_form_calendar_mode_kwargs(request))
 		if form.is_valid():
 			blocks_record = form.save()
 			
@@ -2590,7 +2675,7 @@ def blocks_record_edit(request, pk):
 			return redirect("blocks_records")
 		messages.error(request, "Please fix the errors below.")
 	else:
-		form = BlocksRecordForm(instance=blocks_record)
+		form = BlocksRecordForm(instance=blocks_record, **_form_calendar_mode_kwargs(request))
 
 	return render(
 		request,
@@ -2669,8 +2754,13 @@ def cement_records(request):
 	record_type = request.GET.get("record_type", "").strip()
 	payment_status = request.GET.get("payment_status", "").strip()
 	unit_type = request.GET.get("unit_type", "").strip()
-	date_from = request.GET.get("date_from", "").strip() or default_from
-	date_to = request.GET.get("date_to", "").strip() or default_to
+	date_filters = _resolve_request_date_filters(
+		request,
+		default_from=default_from,
+		default_to=default_to,
+	)
+	date_from = date_filters["date_from"]
+	date_to = date_filters["date_to"]
 	sort = request.GET.get("sort", "-date")
 
 	if query:
@@ -2711,8 +2801,8 @@ def cement_records(request):
 			"record_type": record_type,
 			"payment_status": payment_status,
 			"unit_type": unit_type,
-			"date_from": date_from,
-			"date_to": date_to,
+			"date_from": date_filters["date_from_display"],
+			"date_to": date_filters["date_to_display"],
 			"sort": sort,
 		},
 		"record_type_choices": CementRecordType.choices,
@@ -2730,7 +2820,7 @@ def cement_records(request):
 def cement_record_create(request):
 	"""Create a new cement record."""
 	if request.method == "POST":
-		form = CementRecordForm(request.POST)
+		form = CementRecordForm(request.POST, **_form_calendar_mode_kwargs(request))
 		if form.is_valid():
 			cement_record = form.save()
 			if cement_record.is_sale:
@@ -2739,7 +2829,7 @@ def cement_record_create(request):
 			return redirect("cement_records")
 		messages.error(request, "Please fix the errors below.")
 	else:
-		form = CementRecordForm(initial={"date": timezone.localdate()})
+		form = CementRecordForm(initial={"date": timezone.localdate()}, **_form_calendar_mode_kwargs(request))
 
 	return render(
 		request,
@@ -2758,7 +2848,7 @@ def cement_record_edit(request, pk):
 	cement_record = get_object_or_404(CementRecord, pk=pk)
 
 	if request.method == "POST":
-		form = CementRecordForm(request.POST, instance=cement_record)
+		form = CementRecordForm(request.POST, instance=cement_record, **_form_calendar_mode_kwargs(request))
 		if form.is_valid():
 			cement_record = form.save()
 			cement_record.transactions.filter(type=TransactionType.INCOME).delete()
@@ -2768,7 +2858,7 @@ def cement_record_edit(request, pk):
 			return redirect("cement_records")
 		messages.error(request, "Please fix the errors below.")
 	else:
-		form = CementRecordForm(instance=cement_record)
+		form = CementRecordForm(instance=cement_record, **_form_calendar_mode_kwargs(request))
 
 	return render(
 		request,
@@ -2845,8 +2935,13 @@ def bamboo_records(request):
 	query = request.GET.get("q", "").strip()
 	record_type = request.GET.get("record_type", "").strip()
 	payment_status = request.GET.get("payment_status", "").strip()
-	date_from = request.GET.get("date_from", "").strip() or default_from
-	date_to = request.GET.get("date_to", "").strip() or default_to
+	date_filters = _resolve_request_date_filters(
+		request,
+		default_from=default_from,
+		default_to=default_to,
+	)
+	date_from = date_filters["date_from"]
+	date_to = date_filters["date_to"]
 	sort = request.GET.get("sort", "-date")
 
 	if query:
@@ -2884,8 +2979,8 @@ def bamboo_records(request):
 			"q": query,
 			"record_type": record_type,
 			"payment_status": payment_status,
-			"date_from": date_from,
-			"date_to": date_to,
+			"date_from": date_filters["date_from_display"],
+			"date_to": date_filters["date_to_display"],
 			"sort": sort,
 		},
 		"record_type_choices": BambooRecordType.choices,
@@ -2902,7 +2997,7 @@ def bamboo_records(request):
 def bamboo_record_create(request):
 	"""Create a new bamboo record."""
 	if request.method == "POST":
-		form = BambooRecordForm(request.POST)
+		form = BambooRecordForm(request.POST, **_form_calendar_mode_kwargs(request))
 		if form.is_valid():
 			bamboo_record = form.save()
 			if bamboo_record.is_sale:
@@ -2911,7 +3006,7 @@ def bamboo_record_create(request):
 			return redirect("bamboo_records")
 		messages.error(request, "Please fix the errors below.")
 	else:
-		form = BambooRecordForm(initial={"date": timezone.localdate()})
+		form = BambooRecordForm(initial={"date": timezone.localdate()}, **_form_calendar_mode_kwargs(request))
 
 	return render(
 		request,
@@ -2930,7 +3025,7 @@ def bamboo_record_edit(request, pk):
 	bamboo_record = get_object_or_404(BambooRecord, pk=pk)
 
 	if request.method == "POST":
-		form = BambooRecordForm(request.POST, instance=bamboo_record)
+		form = BambooRecordForm(request.POST, instance=bamboo_record, **_form_calendar_mode_kwargs(request))
 		if form.is_valid():
 			bamboo_record = form.save()
 			bamboo_record.transactions.filter(type=TransactionType.INCOME).delete()
@@ -2940,7 +3035,7 @@ def bamboo_record_edit(request, pk):
 			return redirect("bamboo_records")
 		messages.error(request, "Please fix the errors below.")
 	else:
-		form = BambooRecordForm(instance=bamboo_record)
+		form = BambooRecordForm(instance=bamboo_record, **_form_calendar_mode_kwargs(request))
 
 	return render(
 		request,

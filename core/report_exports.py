@@ -20,6 +20,7 @@ from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import mm
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
+from .bs_date_utils import resolve_ad_date_filters
 from .models import (
     AlertNotification,
     AlertSource,
@@ -115,8 +116,12 @@ def _filtered_transactions(params, include_credit_adjustments=False):
     transaction_type = (params.get("type", "") or "").strip()
     customer_id = (params.get("customer", "") or "").strip()
     category_id = (params.get("category", "") or "").strip()
-    date_from = _parse_date(params.get("date_from", "") or "")
-    date_to = _parse_date(params.get("date_to", "") or "")
+    resolved_date_from, resolved_date_to = resolve_ad_date_filters(
+        params,
+        calendar_mode=(params.get("calendar_mode", "ad") or "ad"),
+    )
+    date_from = _parse_date(resolved_date_from)
+    date_to = _parse_date(resolved_date_to)
     sort = (params.get("sort", "-date") or "-date").strip()
 
     if query:
@@ -173,8 +178,12 @@ def _filtered_sales(params):
     query = (params.get("q", "") or "").strip()
     status = (params.get("status", "") or "").strip()
     customer_id = (params.get("customer", "") or "").strip()
-    date_from = _parse_date(params.get("date_from", "") or "")
-    date_to = _parse_date(params.get("date_to", "") or "")
+    resolved_date_from, resolved_date_to = resolve_ad_date_filters(
+        params,
+        calendar_mode=(params.get("calendar_mode", "ad") or "ad"),
+    )
+    date_from = _parse_date(resolved_date_from)
+    date_to = _parse_date(resolved_date_to)
     sort = (params.get("sort", "-date") or "-date").strip()
 
     if query:
@@ -223,8 +232,12 @@ def _filtered_jcb_records(params):
 
     query = (params.get("q", "") or "").strip()
     status = (params.get("status", "") or "").strip()
-    date_from = _parse_date(params.get("date_from", "") or "")
-    date_to = _parse_date(params.get("date_to", "") or "")
+    resolved_date_from, resolved_date_to = resolve_ad_date_filters(
+        params,
+        calendar_mode=(params.get("calendar_mode", "ad") or "ad"),
+    )
+    date_from = _parse_date(resolved_date_from)
+    date_to = _parse_date(resolved_date_to)
     sort = (params.get("sort", "-date") or "-date").strip()
 
     if query:
@@ -267,8 +280,12 @@ def _filtered_tipper_records(params):
     query = (params.get("q", "") or "").strip()
     record_type = (params.get("record_type", "") or "").strip()
     item_id = (params.get("item", "") or "").strip()
-    date_from = _parse_date(params.get("date_from", "") or "")
-    date_to = _parse_date(params.get("date_to", "") or "")
+    resolved_date_from, resolved_date_to = resolve_ad_date_filters(
+        params,
+        calendar_mode=(params.get("calendar_mode", "ad") or "ad"),
+    )
+    date_from = _parse_date(resolved_date_from)
+    date_to = _parse_date(resolved_date_to)
     sort = (params.get("sort", "-date") or "-date").strip()
 
     if query:
@@ -305,8 +322,12 @@ def _filtered_material_records(params, model, record_type_choices, unit_type_cho
     query = (params.get("q", "") or "").strip()
     record_type = (params.get("record_type", "") or "").strip()
     payment_status = (params.get("payment_status", "") or "").strip()
-    date_from = _parse_date(params.get("date_from", "") or "")
-    date_to = _parse_date(params.get("date_to", "") or "")
+    resolved_date_from, resolved_date_to = resolve_ad_date_filters(
+        params,
+        calendar_mode=(params.get("calendar_mode", "ad") or "ad"),
+    )
+    date_from = _parse_date(resolved_date_from)
+    date_to = _parse_date(resolved_date_to)
     sort = (params.get("sort", "-date") or "-date").strip()
     unit_type = (params.get("unit_type", "") or "").strip()
 
@@ -347,8 +368,12 @@ def _alert_items(params):
     upcoming_end = today + timedelta(days=7)
     alert_type = (params.get("type", "") or "").strip()
     customer_id = (params.get("customer", "") or "").strip()
-    date_from = _parse_date(params.get("date_from", "") or "")
-    date_to = _parse_date(params.get("date_to", "") or "")
+    resolved_date_from, resolved_date_to = resolve_ad_date_filters(
+        params,
+        calendar_mode=(params.get("calendar_mode", "ad") or "ad"),
+    )
+    date_from = _parse_date(resolved_date_from)
+    date_to = _parse_date(resolved_date_to)
 
     sales_queryset = Sale.objects.select_related("customer").filter(
         status=RecordStatus.PENDING,
