@@ -1467,6 +1467,43 @@ def _customer_payment_context(customer, request):
 	pending_material_total = sum((row["pending_amount"] for row in pending_material_rows), Decimal("0.00"))
 	pending_item_count = len(pending_sales_rows) + len(pending_material_rows)
 
+	pending_payment_rows = []
+	for row in pending_sales_rows:
+		sale = row["sale"]
+		pending_payment_rows.append(
+			{
+				"source": "Invoice",
+				"kind": "invoice",
+				"reference": sale.invoice_number,
+				"date": sale.date,
+				"details": sale.notes or "-",
+				"total": sale.total_amount,
+				"paid": sale.paid_amount,
+				"due": row["due_amount"],
+				"status": sale.get_status_display(),
+				"sale_id": sale.id,
+			}
+		)
+
+	for row in pending_material_rows:
+		record = row["record"]
+		pending_payment_rows.append(
+			{
+				"source": row["label"],
+				"kind": "module",
+				"reference": f"#{record.id}",
+				"date": record.date,
+				"details": row["descriptor"],
+				"total": record.sale_income or Decimal("0.00"),
+				"paid": record.paid_amount or Decimal("0.00"),
+				"due": row["pending_amount"],
+				"status": record.get_payment_status_display(),
+				"sale_id": None,
+			}
+		)
+
+	pending_payment_rows.sort(key=lambda row: (row["date"], row["source"], row["reference"]))
+
 	transaction_totals = customer.transactions.filter(type=TransactionType.INCOME).exclude(
 		category__name=CREDIT_BALANCE_APPLIED_CATEGORY,
 	).aggregate(
@@ -1482,6 +1519,7 @@ def _customer_payment_context(customer, request):
 		"pending_material_rows": pending_material_rows,
 		"pending_material_total": pending_material_total,
 		"pending_item_count": pending_item_count,
+		"pending_payment_rows": pending_payment_rows,
 		"total_payment": transaction_totals["total_income"],
 		"due_amount": due_amount,
 		"manual_due_amount": customer.manual_due_amount,
@@ -3088,10 +3126,6 @@ def blocks_record_mark_paid(request, pk):
 		messages.info(request, "Blocks record is already marked as paid.")
 		return _redirect_to_next_or_default(request, "blocks_records")
 
-	if not blocks_record.customer_id:
-		messages.error(request, "Assign a customer before marking this sale as paid.")
-		return _redirect_to_next_or_default(request, "blocks_records")
-
 	blocks_record.paid_amount = blocks_record.sale_income or Decimal("0.00")
 	blocks_record.save()
 	_reconcile_material_sale_income_transaction(blocks_record)
@@ -3268,10 +3302,6 @@ def cement_record_mark_paid(request, pk):
 		messages.info(request, "Cement record is already marked as paid.")
 		return _redirect_to_next_or_default(request, "cement_records")
 
-	if not cement_record.customer_id:
-		messages.error(request, "Assign a customer before marking this sale as paid.")
-		return _redirect_to_next_or_default(request, "cement_records")
-
 	cement_record.paid_amount = cement_record.sale_income or Decimal("0.00")
 	cement_record.save()
 	_reconcile_material_sale_income_transaction(cement_record)
@@ -3441,10 +3471,6 @@ def bamboo_record_mark_paid(request, pk):
 
 	if bamboo_record.payment_status == RecordStatus.PAID:
 		messages.info(request, "Bamboo record is already marked as paid.")
-		return _redirect_to_next_or_default(request, "bamboo_records")
-
-	if not bamboo_record.customer_id:
-		messages.error(request, "Assign a customer before marking this sale as paid.")
 		return _redirect_to_next_or_default(request, "bamboo_records")
 
 	bamboo_record.paid_amount = bamboo_record.sale_income or Decimal("0.00")

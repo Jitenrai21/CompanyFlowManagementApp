@@ -1223,7 +1223,7 @@ class BlocksInvestmentLedgerSyncTests(TestCase):
 		self.assertEqual(record.paid_amount, Decimal("0.00"))
 		self.assertFalse(Transaction.objects.filter(blocks_record=record, type=TransactionType.INCOME).exists())
 
-	def test_sale_requires_customer_assignment(self):
+	def test_sale_customer_assignment_is_optional(self):
 		self.client.login(username="blocks-sync", password="pass1234")
 		response = self.client.post(
 			reverse("blocks_record_create"),
@@ -1236,8 +1236,55 @@ class BlocksInvestmentLedgerSyncTests(TestCase):
 				"paid_amount": "0.00",
 			},
 		)
-		self.assertEqual(response.status_code, 200)
-		self.assertContains(response, "Customer is required for sale records")
+		self.assertEqual(response.status_code, 302)
+		record = BlocksRecord.objects.get(record_type=BlocksRecordType.SALE)
+		self.assertIsNone(record.customer)
+
+	def test_blocks_sale_marked_paid_with_empty_amount_auto_populates(self):
+		"""When form status=PAID but paid_amount empty, auto-fill with sale_income."""
+		self.client.login(username="blocks-sync", password="pass1234")
+		response = self.client.post(
+			reverse("blocks_record_create"),
+			data={
+				"date": bs_today_date().isoformat(),
+				"record_type": BlocksRecordType.SALE,
+				"customer_input": self.customer.name,
+				"unit_type": "4_inch",
+				"quantity": "10",
+				"price_per_unit": "100.00",
+				"payment_status": RecordStatus.PAID,
+				"paid_amount": "",
+			},
+		)
+		self.assertEqual(response.status_code, 302)
+		record = BlocksRecord.objects.get(record_type=BlocksRecordType.SALE)
+		self.assertEqual(record.sale_income, Decimal("1000.00"))
+		self.assertEqual(record.paid_amount, Decimal("1000.00"))
+		self.assertEqual(record.payment_status, RecordStatus.PAID)
+		self.assertEqual(record.pending_amount, Decimal("0.00"))
+
+	def test_blocks_sale_with_partial_payment_stays_pending(self):
+		"""Partial payment should not auto-populate and keep status as pending."""
+		self.client.login(username="blocks-sync", password="pass1234")
+		response = self.client.post(
+			reverse("blocks_record_create"),
+			data={
+				"date": bs_today_date().isoformat(),
+				"record_type": BlocksRecordType.SALE,
+				"customer_input": self.customer.name,
+				"unit_type": "4_inch",
+				"quantity": "10",
+				"price_per_unit": "100.00",
+				"payment_status": RecordStatus.PAID,
+				"paid_amount": "600.00",
+			},
+		)
+		self.assertEqual(response.status_code, 302)
+		record = BlocksRecord.objects.get(record_type=BlocksRecordType.SALE)
+		self.assertEqual(record.sale_income, Decimal("1000.00"))
+		self.assertEqual(record.paid_amount, Decimal("600.00"))
+		self.assertEqual(record.pending_amount, Decimal("400.00"))
+		self.assertEqual(record.payment_status, RecordStatus.PENDING)
 
 	def test_delete_investment_record_does_not_delete_linked_expense_transaction(self):
 		self.client.login(username="blocks-sync", password="pass1234")
@@ -1330,7 +1377,7 @@ class CementInvestmentLedgerSyncTests(TestCase):
 		self.assertEqual(record.paid_amount, Decimal("0.00"))
 		self.assertFalse(Transaction.objects.filter(cement_record=record, type=TransactionType.INCOME).exists())
 
-	def test_sale_requires_customer_assignment(self):
+	def test_sale_customer_assignment_is_optional(self):
 		self.client.login(username="cement-sync", password="pass1234")
 		response = self.client.post(
 			reverse("cement_record_create"),
@@ -1343,8 +1390,55 @@ class CementInvestmentLedgerSyncTests(TestCase):
 				"paid_amount": "0.00",
 			},
 		)
-		self.assertEqual(response.status_code, 200)
-		self.assertContains(response, "Customer is required for sale records")
+		self.assertEqual(response.status_code, 302)
+		record = CementRecord.objects.get(record_type=CementRecordType.SALE)
+		self.assertIsNone(record.customer)
+
+	def test_cement_sale_marked_paid_with_empty_amount_auto_populates(self):
+		"""When form status=PAID but paid_amount empty, auto-fill with sale_income."""
+		self.client.login(username="cement-sync", password="pass1234")
+		response = self.client.post(
+			reverse("cement_record_create"),
+			data={
+				"date": bs_today_date().isoformat(),
+				"record_type": CementRecordType.SALE,
+				"customer_input": self.customer.name,
+				"unit_type": CementUnitType.PPC,
+				"quantity": "5",
+				"price_per_unit": "200.00",
+				"payment_status": RecordStatus.PAID,
+				"paid_amount": "",
+			},
+		)
+		self.assertEqual(response.status_code, 302)
+		record = CementRecord.objects.get(record_type=CementRecordType.SALE)
+		self.assertEqual(record.sale_income, Decimal("1000.00"))
+		self.assertEqual(record.paid_amount, Decimal("1000.00"))
+		self.assertEqual(record.payment_status, RecordStatus.PAID)
+		self.assertEqual(record.pending_amount, Decimal("0.00"))
+
+	def test_cement_sale_with_partial_payment_stays_pending(self):
+		"""Partial payment should not auto-populate and keep status as pending."""
+		self.client.login(username="cement-sync", password="pass1234")
+		response = self.client.post(
+			reverse("cement_record_create"),
+			data={
+				"date": bs_today_date().isoformat(),
+				"record_type": CementRecordType.SALE,
+				"customer_input": self.customer.name,
+				"unit_type": CementUnitType.PPC,
+				"quantity": "5",
+				"price_per_unit": "200.00",
+				"payment_status": RecordStatus.PAID,
+				"paid_amount": "750.00",
+			},
+		)
+		self.assertEqual(response.status_code, 302)
+		record = CementRecord.objects.get(record_type=CementRecordType.SALE)
+		self.assertEqual(record.sale_income, Decimal("1000.00"))
+		self.assertEqual(record.paid_amount, Decimal("750.00"))
+		self.assertEqual(record.pending_amount, Decimal("250.00"))
+		self.assertEqual(record.payment_status, RecordStatus.PENDING)
 
 	def test_delete_investment_record_does_not_delete_linked_expense_transaction(self):
 		self.client.login(username="cement-sync", password="pass1234")
@@ -1418,7 +1512,7 @@ class BambooInvestmentLedgerSyncTests(TestCase):
 		self.assertEqual(record.paid_amount, Decimal("0.00"))
 		self.assertFalse(Transaction.objects.filter(bamboo_record=record, type=TransactionType.INCOME).exists())
 
-	def test_sale_requires_customer_assignment(self):
+	def test_sale_customer_assignment_is_optional(self):
 		self.client.login(username="bamboo-sync", password="pass1234")
 		response = self.client.post(
 			reverse("bamboo_record_create"),
@@ -1430,8 +1524,53 @@ class BambooInvestmentLedgerSyncTests(TestCase):
 				"paid_amount": "0.00",
 			},
 		)
-		self.assertEqual(response.status_code, 200)
-		self.assertContains(response, "Customer is required for sale records")
+		self.assertEqual(response.status_code, 302)
+		record = BambooRecord.objects.get(record_type=BambooRecordType.SALE)
+		self.assertIsNone(record.customer)
+
+	def test_bamboo_sale_marked_paid_with_empty_amount_auto_populates(self):
+		"""When form status=PAID but paid_amount empty, auto-fill with sale_income."""
+		self.client.login(username="bamboo-sync", password="pass1234")
+		response = self.client.post(
+			reverse("bamboo_record_create"),
+			data={
+				"date": bs_today_date().isoformat(),
+				"record_type": BambooRecordType.SALE,
+				"customer_input": self.customer.name,
+				"quantity": "8",
+				"price_per_unit": "125.00",
+				"payment_status": RecordStatus.PAID,
+				"paid_amount": "",
+			},
+		)
+		self.assertEqual(response.status_code, 302)
+		record = BambooRecord.objects.get(record_type=BambooRecordType.SALE)
+		self.assertEqual(record.sale_income, Decimal("1000.00"))
+		self.assertEqual(record.paid_amount, Decimal("1000.00"))
+		self.assertEqual(record.payment_status, RecordStatus.PAID)
+		self.assertEqual(record.pending_amount, Decimal("0.00"))
+
+	def test_bamboo_sale_with_partial_payment_stays_pending(self):
+		"""Partial payment should not auto-populate and keep status as pending."""
+		self.client.login(username="bamboo-sync", password="pass1234")
+		response = self.client.post(
+			reverse("bamboo_record_create"),
+			data={
+				"date": bs_today_date().isoformat(),
+				"record_type": BambooRecordType.SALE,
+				"customer_input": self.customer.name,
+				"quantity": "8",
+				"price_per_unit": "125.00",
+				"payment_status": RecordStatus.PAID,
+				"paid_amount": "500.00",
+			},
+		)
+		self.assertEqual(response.status_code, 302)
+		record = BambooRecord.objects.get(record_type=BambooRecordType.SALE)
+		self.assertEqual(record.sale_income, Decimal("1000.00"))
+		self.assertEqual(record.paid_amount, Decimal("500.00"))
+		self.assertEqual(record.pending_amount, Decimal("500.00"))
+		self.assertEqual(record.payment_status, RecordStatus.PENDING)
 
 
 class ModuleCustomerAllocationTests(TestCase):
@@ -1446,6 +1585,14 @@ class ModuleCustomerAllocationTests(TestCase):
 			unit_type=BlocksUnitType.FOUR_INCH,
 			quantity=10,
 			price_per_unit=Decimal("100.00"),
+			paid_amount=Decimal("0.00"),
+		)
+		self.unassigned_bamboo_sale = BambooRecord.objects.create(
+			date=bs_today_date(),
+			record_type=BambooRecordType.SALE,
+			customer=None,
+			quantity=5,
+			price_per_unit=Decimal("80.00"),
 			paid_amount=Decimal("0.00"),
 		)
 
@@ -1469,6 +1616,17 @@ class ModuleCustomerAllocationTests(TestCase):
 		detail = self.client.get(reverse("customer_detail", args=[self.customer.pk]))
 		self.assertEqual(detail.status_code, 200)
 		self.assertEqual(detail.context["due_amount"], Decimal("600.00"))
+
+	def test_customer_profile_uses_merged_pending_table_and_ignores_unassigned_modules(self):
+		self.client.login(username="module-alloc", password="pass1234")
+		detail = self.client.get(reverse("customer_detail", args=[self.customer.pk]))
+		self.assertEqual(detail.status_code, 200)
+		self.assertContains(detail, "Total Pending Payments")
+		self.assertContains(detail, "Source/Type")
+		self.assertContains(detail, "Supplementary Sales")
+		self.assertContains(detail, "Blocks")
+		self.assertNotContains(detail, f"#{self.unassigned_bamboo_sale.pk}")
+		self.assertEqual(len(detail.context["pending_payment_rows"]), 1)
 
 	def test_delete_investment_record_does_not_delete_linked_expense_transaction(self):
 		self.client.login(username="module-alloc", password="pass1234")

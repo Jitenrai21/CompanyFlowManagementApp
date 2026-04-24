@@ -182,6 +182,101 @@
         return formatNprNumber(numeric, { forceInteger: true });
     }
 
+    const incomeExpenseBarStyleSpec = {
+        animationDuration: 820,
+        legend: {
+            top: 0,
+            textColor: '#31445F',
+            selectedMode: true
+        },
+        grid: { left: 18, right: 18, top: 42, bottom: 22, containLabel: true },
+        axis: {
+            lineColor: '#D4DFEA',
+            labelColor: '#516178',
+            splitLineColor: 'rgba(80, 110, 150, 0.12)'
+        },
+        tooltip: {
+            trigger: 'axis',
+            axisPointer: 'shadow',
+            backgroundColor: 'rgba(15, 23, 42, 0.94)',
+            textColor: '#F8FAFC'
+        },
+        series: {
+            barMaxWidth: 28,
+            borderRadius: [8, 8, 0, 0],
+            emphasisFocus: 'series'
+        }
+    };
+
+    function buildSharedBarSeries(overrides = {}) {
+        const baseItemStyle = { borderRadius: incomeExpenseBarStyleSpec.series.borderRadius };
+        const mergedItemStyle = Object.assign({}, baseItemStyle, overrides.itemStyle || {});
+        return Object.assign(
+            {
+                type: 'bar',
+                barMaxWidth: incomeExpenseBarStyleSpec.series.barMaxWidth,
+                itemStyle: mergedItemStyle,
+                emphasis: { focus: incomeExpenseBarStyleSpec.series.emphasisFocus }
+            },
+            overrides
+        );
+    }
+
+    function buildSharedBarChartOption(config) {
+        const horizontal = Boolean(config.horizontal);
+        const categoryAxis = Object.assign(
+            {
+                type: 'category',
+                data: config.labels || [],
+                axisLine: { lineStyle: { color: incomeExpenseBarStyleSpec.axis.lineColor } },
+                axisLabel: Object.assign({ color: incomeExpenseBarStyleSpec.axis.labelColor }, config.categoryAxisLabel || {})
+            },
+            config.categoryAxis || {}
+        );
+
+        const valueAxis = Object.assign(
+            {
+                type: 'value',
+                splitLine: { lineStyle: { color: incomeExpenseBarStyleSpec.axis.splitLineColor } },
+                axisLabel: Object.assign(
+                    {
+                        color: incomeExpenseBarStyleSpec.axis.labelColor,
+                        formatter: config.valueAxisFormatter || ((value) => formatNprAxis(value))
+                    },
+                    config.valueAxisLabel || {}
+                )
+            },
+            config.valueAxis || {}
+        );
+
+        return {
+            animationDuration: config.animationDuration || incomeExpenseBarStyleSpec.animationDuration,
+            color: config.colors || [chartPalette.mint, chartPalette.coral],
+            legend: Object.assign(
+                {
+                    top: incomeExpenseBarStyleSpec.legend.top,
+                    textStyle: { color: incomeExpenseBarStyleSpec.legend.textColor },
+                    selectedMode: incomeExpenseBarStyleSpec.legend.selectedMode
+                },
+                config.legend || {}
+            ),
+            tooltip: Object.assign(
+                {
+                    trigger: incomeExpenseBarStyleSpec.tooltip.trigger,
+                    axisPointer: { type: incomeExpenseBarStyleSpec.tooltip.axisPointer },
+                    backgroundColor: incomeExpenseBarStyleSpec.tooltip.backgroundColor,
+                    borderWidth: 0,
+                    textStyle: { color: incomeExpenseBarStyleSpec.tooltip.textColor }
+                },
+                config.tooltip || {}
+            ),
+            grid: Object.assign({}, incomeExpenseBarStyleSpec.grid, config.grid || {}),
+            xAxis: horizontal ? valueAxis : categoryAxis,
+            yAxis: horizontal ? categoryAxis : valueAxis,
+            series: (config.series || []).map((series) => buildSharedBarSeries(series))
+        };
+    }
+
     function applyNprCurrencyFormatting(root = document) {
         root.querySelectorAll('.js-npr-value').forEach((element) => {
             const rawValue = element.dataset.nprValue;
@@ -521,20 +616,10 @@
         if (pieCanvas && incomeExpenseLabels && incomeExpenseValues) {
             const { income, expense } = splitIncomeExpense(incomeExpenseLabels, incomeExpenseValues);
             const barChart = echarts.init(pieCanvas, null, { renderer: 'canvas' });
-            barChart.setOption({
-                animationDuration: 820,
-                color: [chartPalette.mint, chartPalette.coral],
-                legend: {
-                    top: 0,
-                    textStyle: { color: '#31445F' },
-                    selectedMode: true
-                },
+            barChart.setOption(buildSharedBarChartOption({
+                labels: incomeExpenseLabels,
+                colors: [chartPalette.mint, chartPalette.coral],
                 tooltip: {
-                    trigger: 'axis',
-                    axisPointer: { type: 'shadow' },
-                    backgroundColor: 'rgba(15, 23, 42, 0.94)',
-                    borderWidth: 0,
-                    textStyle: { color: '#F8FAFC' },
                     formatter(params) {
                         const incomeValue = numberFrom(params.find((item) => item.seriesName === 'Income')?.value);
                         const expenseValue = numberFrom(params.find((item) => item.seriesName === 'Expense')?.value);
@@ -542,37 +627,11 @@
                         return `${params[0].axisValue}<br/>Income: ${formatNpr(incomeValue)}<br/>Expense: ${formatNpr(expenseValue)}<br/>Net: ${formatNpr(net)}`;
                     }
                 },
-                grid: { left: 18, right: 18, top: 42, bottom: 22, containLabel: true },
-                xAxis: {
-                    type: 'category',
-                    data: incomeExpenseLabels,
-                    axisLine: { lineStyle: { color: '#D4DFEA' } },
-                    axisLabel: { color: '#516178' }
-                },
-                yAxis: {
-                    type: 'value',
-                    splitLine: { lineStyle: { color: 'rgba(80, 110, 150, 0.12)' } },
-                    axisLabel: { color: '#516178', formatter: (value) => formatNprAxis(value) }
-                },
                 series: [
-                    {
-                        name: 'Income',
-                        type: 'bar',
-                        barMaxWidth: 28,
-                        itemStyle: { borderRadius: [8, 8, 0, 0] },
-                        emphasis: { focus: 'series' },
-                        data: income
-                    },
-                    {
-                        name: 'Expense',
-                        type: 'bar',
-                        barMaxWidth: 28,
-                        itemStyle: { borderRadius: [8, 8, 0, 0] },
-                        emphasis: { focus: 'series' },
-                        data: expense
-                    }
+                    { name: 'Income', data: income },
+                    { name: 'Expense', data: expense }
                 ]
-            });
+            }));
             registerChart('incomeExpense', barChart, pieCanvas);
         }
 
@@ -586,49 +645,42 @@
             const pendingBarCategoryGap = labels.length > 8 ? '58%' : '44%';
 
             const topPendingChart = echarts.init(topPendingCanvas, null, { renderer: 'canvas' });
-            topPendingChart.setOption({
+            // Exception: ranking bars remain horizontal with contribution tooltip for readability.
+            topPendingChart.setOption(buildSharedBarChartOption({
+                horizontal: true,
                 animationDuration: 960,
+                labels,
                 legend: {
-                    top: 0,
                     left: 'left',
                     itemHeight: 10,
                     icon: 'roundRect',
-                    textStyle: { color: '#31445F' },
                     data: ['Pending Amount']
                 },
                 grid: { left: 112, right: 24, top: 42, bottom: 36, containLabel: true },
-                xAxis: {
-                    type: 'value',
+                valueAxis: {
                     splitNumber: 4,
                     name: 'Pending Amount (NPR)',
                     nameLocation: 'middle',
                     nameGap: 28,
-                    nameTextStyle: { color: '#516178', fontWeight: 600 },
-                    axisLabel: {
-                        color: '#516178',
-                        hideOverlap: true,
-                        margin: 10,
-                        formatter: (value) => formatCompactAxisValue(value)
-                    },
-                    splitLine: { lineStyle: { color: 'rgba(80, 110, 150, 0.12)' } }
+                    nameTextStyle: { color: '#516178', fontWeight: 600 }
                 },
-                yAxis: {
-                    type: 'category',
+                valueAxisLabel: {
+                    hideOverlap: true,
+                    margin: 10
+                },
+                valueAxisFormatter: (value) => formatCompactAxisValue(value),
+                categoryAxis: {
                     inverse: true,
-                    data: labels,
-                    axisLabel: {
-                        color: '#31445F',
-                        width: 102,
-                        overflow: 'truncate'
-                    },
                     axisTick: { show: false },
                     axisLine: { show: false }
                 },
+                categoryAxisLabel: {
+                    color: '#31445F',
+                    width: 102,
+                    overflow: 'truncate'
+                },
                 tooltip: {
                     trigger: 'item',
-                    backgroundColor: 'rgba(15, 23, 42, 0.94)',
-                    borderWidth: 0,
-                    textStyle: { color: '#F8FAFC' },
                     formatter(param) {
                         const value = numberFrom(param.value);
                         const pct = total > 0 ? ((value / total) * 100).toFixed(1) : '0.0';
@@ -637,7 +689,6 @@
                 },
                 series: [{
                     name: 'Pending Amount',
-                    type: 'bar',
                     data: values.map((value, index) => ({
                         value,
                         itemStyle: {
@@ -653,10 +704,9 @@
                         position: 'right',
                         color: '#31445F',
                         formatter: ({ value }) => formatCompactAxisValue(value)
-                    },
-                    emphasis: { focus: 'series' }
+                    }
                 }]
-            });
+            }));
             registerChart('topPendingCustomers', topPendingChart, topPendingCanvas);
             attachBarKeyboardNavigation(topPendingChart, topPendingCanvas, labels, values, 'Pending Amount');
         }
@@ -671,49 +721,42 @@
             const salesBarCategoryGap = labels.length > 8 ? '58%' : '44%';
 
             const topCustomersChart = echarts.init(topCanvas, null, { renderer: 'canvas' });
-            topCustomersChart.setOption({
+            // Exception: ranking bars remain horizontal with contribution tooltip for readability.
+            topCustomersChart.setOption(buildSharedBarChartOption({
+                horizontal: true,
                 animationDuration: 960,
+                labels,
                 legend: {
-                    top: 0,
                     left: 'left',
                     itemHeight: 10,
                     icon: 'roundRect',
-                    textStyle: { color: '#31445F' },
                     data: ['Sales Amount']
                 },
                 grid: { left: 112, right: 24, top: 42, bottom: 36, containLabel: true },
-                xAxis: {
-                    type: 'value',
+                valueAxis: {
                     splitNumber: 4,
                     name: 'Sales Amount (NPR)',
                     nameLocation: 'middle',
                     nameGap: 28,
-                    nameTextStyle: { color: '#516178', fontWeight: 600 },
-                    axisLabel: {
-                        color: '#516178',
-                        hideOverlap: true,
-                        margin: 10,
-                        formatter: (value) => formatCompactAxisValue(value)
-                    },
-                    splitLine: { lineStyle: { color: 'rgba(80, 110, 150, 0.12)' } }
+                    nameTextStyle: { color: '#516178', fontWeight: 600 }
                 },
-                yAxis: {
-                    type: 'category',
+                valueAxisLabel: {
+                    hideOverlap: true,
+                    margin: 10
+                },
+                valueAxisFormatter: (value) => formatCompactAxisValue(value),
+                categoryAxis: {
                     inverse: true,
-                    data: labels,
-                    axisLabel: {
-                        color: '#31445F',
-                        width: 102,
-                        overflow: 'truncate'
-                    },
                     axisTick: { show: false },
                     axisLine: { show: false }
                 },
+                categoryAxisLabel: {
+                    color: '#31445F',
+                    width: 102,
+                    overflow: 'truncate'
+                },
                 tooltip: {
                     trigger: 'item',
-                    backgroundColor: 'rgba(15, 23, 42, 0.94)',
-                    borderWidth: 0,
-                    textStyle: { color: '#F8FAFC' },
                     formatter(param) {
                         const value = numberFrom(param.value);
                         const pct = total > 0 ? ((value / total) * 100).toFixed(1) : '0.0';
@@ -722,7 +765,6 @@
                 },
                 series: [{
                     name: 'Sales Amount',
-                    type: 'bar',
                     data: values.map((value, index) => ({
                         value,
                         itemStyle: {
@@ -738,10 +780,9 @@
                         position: 'right',
                         color: '#31445F',
                         formatter: ({ value }) => formatCompactAxisValue(value)
-                    },
-                    emphasis: { focus: 'series' }
+                    }
                 }]
-            });
+            }));
             registerChart('topCustomers', topCustomersChart, topCanvas);
             attachBarKeyboardNavigation(topCustomersChart, topCanvas, labels, values, 'Sales');
         }
@@ -750,19 +791,13 @@
             const jcbSeries = splitJcbSeries(jcbSummaryLabels, jcbSummaryValues);
 
             const jcbChart = echarts.init(jcbSummaryCanvas, null, { renderer: 'canvas' });
-            jcbChart.setOption({
+            jcbChart.setOption(buildSharedBarChartOption({
+                labels: jcbSummaryLabels,
+                colors: [chartPalette.mint, chartPalette.coral],
                 animationDuration: 920,
-                color: [chartPalette.mint, chartPalette.coral],
-                legend: {
-                    top: 0,
-                    textStyle: { color: '#31445F' }
-                },
+                grid: { left: 18, right: 26, top: 48, bottom: 22, containLabel: true },
+                valueAxis: { name: 'NPR' },
                 tooltip: {
-                    trigger: 'axis',
-                    axisPointer: { type: 'cross' },
-                    backgroundColor: 'rgba(15, 23, 42, 0.94)',
-                    borderWidth: 0,
-                    textStyle: { color: '#F8FAFC' },
                     formatter(params) {
                         const lines = [params[0].axisValue];
                         params.forEach((item) => {
@@ -771,69 +806,30 @@
                         return lines.join('<br/>');
                     }
                 },
-                grid: { left: 18, right: 26, top: 48, bottom: 22, containLabel: true },
-                xAxis: {
-                    type: 'category',
-                    data: jcbSummaryLabels,
-                    axisLine: { lineStyle: { color: '#D4DFEA' } },
-                    axisLabel: { color: '#516178' }
-                },
-                yAxis: {
-                    type: 'value',
-                    name: 'NPR',
-                    axisLabel: { color: '#516178', formatter: (value) => formatNprAxis(value) },
-                    splitLine: { lineStyle: { color: 'rgba(80, 110, 150, 0.12)' } }
-                },
                 series: [
-                    {
-                        name: 'Income',
-                        type: 'bar',
-                        barMaxWidth: 26,
-                        itemStyle: { borderRadius: [8, 8, 0, 0] },
-                        data: jcbSeries.income
-                    },
-                    {
-                        name: 'Expense',
-                        type: 'bar',
-                        barMaxWidth: 26,
-                        itemStyle: { borderRadius: [8, 8, 0, 0] },
-                        data: jcbSeries.expense
-                    }
+                    { name: 'Income', barMaxWidth: 26, data: jcbSeries.income },
+                    { name: 'Expense', barMaxWidth: 26, data: jcbSeries.expense }
                 ]
-            });
+            }));
             registerChart('jcbSummary', jcbChart, jcbSummaryCanvas);
         }
 
         if (tipperSummaryCanvas && tipperSummaryLabels && tipperSummaryValues) {
             const tipperChart = echarts.init(tipperSummaryCanvas, null, { renderer: 'canvas' });
-            tipperChart.setOption({
+            tipperChart.setOption(buildSharedBarChartOption({
+                labels: tipperSummaryLabels,
+                colors: [chartPalette.coral, chartPalette.mint],
                 animationDuration: 860,
-                color: [chartPalette.coral, chartPalette.mint],
+                // Exception: single-series summary chart hides legend to avoid redundant UI noise.
+                legend: { show: false },
                 grid: { left: 18, right: 18, top: 34, bottom: 24, containLabel: true },
                 tooltip: {
-                    trigger: 'axis',
-                    axisPointer: { type: 'shadow' },
-                    backgroundColor: 'rgba(15, 23, 42, 0.94)',
-                    borderWidth: 0,
-                    textStyle: { color: '#F8FAFC' },
                     formatter(params) {
                         const item = params[0];
                         return `${item.axisValue}<br/>Total: ${formatNpr(item.value)}`;
                     }
                 },
-                xAxis: {
-                    type: 'category',
-                    data: tipperSummaryLabels,
-                    axisLine: { lineStyle: { color: '#D4DFEA' } },
-                    axisLabel: { color: '#516178' }
-                },
-                yAxis: {
-                    type: 'value',
-                    splitLine: { lineStyle: { color: 'rgba(80, 110, 150, 0.12)' } },
-                    axisLabel: { color: '#516178', formatter: (value) => formatNprAxis(value) }
-                },
                 series: [{
-                    type: 'bar',
                     barMaxWidth: 42,
                     itemStyle: { borderRadius: [10, 10, 0, 0] },
                     data: tipperSummaryValues.map((value, index) => ({
@@ -847,40 +843,26 @@
                         formatter: ({ value }) => formatCompactAxisValue(value)
                     }
                 }]
-            });
+            }));
             registerChart('tipperSummary', tipperChart, tipperSummaryCanvas);
         }
 
         if (blocksSummaryCanvas && blocksSummaryLabels && blocksSummaryValues) {
             const blocksChart = echarts.init(blocksSummaryCanvas, null, { renderer: 'canvas' });
-            blocksChart.setOption({
+            blocksChart.setOption(buildSharedBarChartOption({
+                labels: blocksSummaryLabels,
+                colors: [chartPalette.coral, chartPalette.mint],
                 animationDuration: 860,
-                color: [chartPalette.coral, chartPalette.mint],
+                // Exception: single-series summary chart hides legend to avoid redundant UI noise.
+                legend: { show: false },
                 grid: { left: 18, right: 18, top: 34, bottom: 24, containLabel: true },
                 tooltip: {
-                    trigger: 'axis',
-                    axisPointer: { type: 'shadow' },
-                    backgroundColor: 'rgba(15, 23, 42, 0.94)',
-                    borderWidth: 0,
-                    textStyle: { color: '#F8FAFC' },
                     formatter(params) {
                         const item = params[0];
                         return `${item.axisValue}<br/>Total: ${formatNpr(item.value)}`;
                     }
                 },
-                xAxis: {
-                    type: 'category',
-                    data: blocksSummaryLabels,
-                    axisLine: { lineStyle: { color: '#D4DFEA' } },
-                    axisLabel: { color: '#516178' }
-                },
-                yAxis: {
-                    type: 'value',
-                    splitLine: { lineStyle: { color: 'rgba(80, 110, 150, 0.12)' } },
-                    axisLabel: { color: '#516178', formatter: (value) => formatNprAxis(value) }
-                },
                 series: [{
-                    type: 'bar',
                     barMaxWidth: 42,
                     itemStyle: { borderRadius: [10, 10, 0, 0] },
                     data: blocksSummaryValues.map((value, index) => ({
@@ -894,40 +876,26 @@
                         formatter: ({ value }) => formatCompactAxisValue(value)
                     }
                 }]
-            });
+            }));
             registerChart('blocksSummary', blocksChart, blocksSummaryCanvas);
         }
 
         if (cementSummaryCanvas && cementSummaryLabels && cementSummaryValues) {
             const cementChart = echarts.init(cementSummaryCanvas, null, { renderer: 'canvas' });
-            cementChart.setOption({
+            cementChart.setOption(buildSharedBarChartOption({
+                labels: cementSummaryLabels,
+                colors: [chartPalette.coral, chartPalette.mint],
                 animationDuration: 860,
-                color: [chartPalette.coral, chartPalette.mint],
+                // Exception: single-series summary chart hides legend to avoid redundant UI noise.
+                legend: { show: false },
                 grid: { left: 18, right: 18, top: 34, bottom: 24, containLabel: true },
                 tooltip: {
-                    trigger: 'axis',
-                    axisPointer: { type: 'shadow' },
-                    backgroundColor: 'rgba(15, 23, 42, 0.94)',
-                    borderWidth: 0,
-                    textStyle: { color: '#F8FAFC' },
                     formatter(params) {
                         const item = params[0];
                         return `${item.axisValue}<br/>Total: ${formatNpr(item.value)}`;
                     }
                 },
-                xAxis: {
-                    type: 'category',
-                    data: cementSummaryLabels,
-                    axisLine: { lineStyle: { color: '#D4DFEA' } },
-                    axisLabel: { color: '#516178' }
-                },
-                yAxis: {
-                    type: 'value',
-                    splitLine: { lineStyle: { color: 'rgba(80, 110, 150, 0.12)' } },
-                    axisLabel: { color: '#516178', formatter: (value) => formatNprAxis(value) }
-                },
                 series: [{
-                    type: 'bar',
                     barMaxWidth: 42,
                     itemStyle: { borderRadius: [10, 10, 0, 0] },
                     data: cementSummaryValues.map((value, index) => ({
@@ -941,40 +909,26 @@
                         formatter: ({ value }) => formatCompactAxisValue(value)
                     }
                 }]
-            });
+            }));
             registerChart('cementSummary', cementChart, cementSummaryCanvas);
         }
 
         if (bambooSummaryCanvas && bambooSummaryLabels && bambooSummaryValues) {
             const bambooChart = echarts.init(bambooSummaryCanvas, null, { renderer: 'canvas' });
-            bambooChart.setOption({
+            bambooChart.setOption(buildSharedBarChartOption({
+                labels: bambooSummaryLabels,
+                colors: [chartPalette.coral, chartPalette.mint],
                 animationDuration: 860,
-                color: [chartPalette.coral, chartPalette.mint],
+                // Exception: single-series summary chart hides legend to avoid redundant UI noise.
+                legend: { show: false },
                 grid: { left: 18, right: 18, top: 34, bottom: 24, containLabel: true },
                 tooltip: {
-                    trigger: 'axis',
-                    axisPointer: { type: 'shadow' },
-                    backgroundColor: 'rgba(15, 23, 42, 0.94)',
-                    borderWidth: 0,
-                    textStyle: { color: '#F8FAFC' },
                     formatter(params) {
                         const item = params[0];
                         return `${item.axisValue}<br/>Total: ${formatNpr(item.value)}`;
                     }
                 },
-                xAxis: {
-                    type: 'category',
-                    data: bambooSummaryLabels,
-                    axisLine: { lineStyle: { color: '#D4DFEA' } },
-                    axisLabel: { color: '#516178' }
-                },
-                yAxis: {
-                    type: 'value',
-                    splitLine: { lineStyle: { color: 'rgba(80, 110, 150, 0.12)' } },
-                    axisLabel: { color: '#516178', formatter: (value) => formatNprAxis(value) }
-                },
                 series: [{
-                    type: 'bar',
                     barMaxWidth: 42,
                     itemStyle: { borderRadius: [10, 10, 0, 0] },
                     data: bambooSummaryValues.map((value, index) => ({
@@ -988,7 +942,7 @@
                         formatter: ({ value }) => formatCompactAxisValue(value)
                     }
                 }]
-            });
+            }));
             registerChart('bambooSummary', bambooChart, bambooSummaryCanvas);
         }
 

@@ -641,7 +641,6 @@ class BlocksRecordForm(forms.ModelForm):
                 cleaned_data["customer"] = customer
             else:
                 cleaned_data["customer"] = None
-                self.add_error("customer_input", "Customer is required for sale records.")
         else:
             cleaned_data["payment_status"] = None
             cleaned_data["customer"] = None
@@ -670,7 +669,13 @@ class BlocksRecordForm(forms.ModelForm):
             if quantity not in (None, "") and price_per_unit not in (None, ""):
                 sale_income = (Decimal(str(quantity)) * Decimal(str(price_per_unit))).quantize(Decimal("0.01"))
                 cleaned_data["sale_income"] = sale_income
-                normalized_paid = Decimal("0.00") if paid_amount in (None, "") else Decimal(str(paid_amount))
+                
+                # Auto-populate paid_amount if user selected "Paid" status but left amount empty
+                if payment_status == RecordStatus.PAID and paid_amount in (None, "", "0", "0.00"):
+                    normalized_paid = sale_income
+                else:
+                    normalized_paid = Decimal("0.00") if paid_amount in (None, "") else Decimal(str(paid_amount))
+                
                 if normalized_paid < 0:
                     self.add_error("paid_amount", "Paid amount cannot be negative.")
                 if normalized_paid > sale_income:
@@ -691,7 +696,7 @@ class BlocksRecordForm(forms.ModelForm):
         self.fields["sale_income"].help_text = "Auto-calculated from quantity × price"
         self.fields["payment_status"].required = False
         self.fields["payment_status"].label = "Payment Status"
-        self.fields["payment_status"].help_text = "Sale records only"
+        self.fields["payment_status"].help_text = "Sale records only. Mark as \"Paid\" to auto-fill the amount, or enter partial payment."
         self.fields["customer"].required = False
         self.fields["customer"].queryset = Customer.objects.order_by("name")
         self.fields["customer"].help_text = "Optional. You can assign a customer for sale records."
@@ -708,6 +713,7 @@ class BlocksRecordForm(forms.ModelForm):
         self.fields["price_per_unit"].required = False
         self.fields["paid_amount"].required = False
         self.fields["paid_amount"].initial = self.initial.get("paid_amount", Decimal("0.00"))
+        self.fields["paid_amount"].help_text = "Leave empty (or zero) when marking as \"Paid\" to auto-fill with full sale income. Enter a partial amount to keep status as pending."
         self.fields["record_type"].label = "Record Type"
         
         for field_name, field in self.fields.items():
@@ -764,7 +770,6 @@ class CementRecordForm(forms.ModelForm):
                 cleaned_data["customer"] = customer
             else:
                 cleaned_data["customer"] = None
-                self.add_error("customer_input", "Customer is required for sale records.")
         else:
             cleaned_data["payment_status"] = None
             cleaned_data["customer"] = None
@@ -788,7 +793,13 @@ class CementRecordForm(forms.ModelForm):
             if quantity not in (None, "") and price_per_unit not in (None, ""):
                 sale_income = (Decimal(str(quantity)) * Decimal(str(price_per_unit))).quantize(Decimal("0.01"))
                 cleaned_data["sale_income"] = sale_income
-                normalized_paid = Decimal("0.00") if paid_amount in (None, "") else Decimal(str(paid_amount))
+                
+                # Auto-populate paid_amount if user selected "Paid" status but left amount empty
+                if payment_status == RecordStatus.PAID and paid_amount in (None, "", "0", "0.00"):
+                    normalized_paid = sale_income
+                else:
+                    normalized_paid = Decimal("0.00") if paid_amount in (None, "") else Decimal(str(paid_amount))
+                
                 if normalized_paid < 0:
                     self.add_error("paid_amount", "Paid amount cannot be negative.")
                 if normalized_paid > sale_income:
@@ -809,7 +820,7 @@ class CementRecordForm(forms.ModelForm):
         self.fields["sale_income"].help_text = "Auto-calculated from quantity × price"
         self.fields["payment_status"].required = False
         self.fields["payment_status"].label = "Payment Status"
-        self.fields["payment_status"].help_text = "Sale records only"
+        self.fields["payment_status"].help_text = "Sale records only. Mark as Paid to auto-fill the amount or enter partial payment."
         self.fields["customer"].required = False
         self.fields["customer"].queryset = Customer.objects.order_by("name")
         self.fields["customer"].help_text = "Optional. You can assign a customer for sale records."
@@ -826,6 +837,7 @@ class CementRecordForm(forms.ModelForm):
         self.fields["price_per_unit"].required = False
         self.fields["paid_amount"].required = False
         self.fields["paid_amount"].initial = self.initial.get("paid_amount", Decimal("0.00"))
+        self.fields["paid_amount"].help_text = "Leave empty or zero when marking as 'Paid' to auto-fill with full sale income. Enter a partial amount to keep status as pending."
         self.fields["record_type"].label = "Record Type"
 
         for field_name, field in self.fields.items():
@@ -880,7 +892,6 @@ class BambooRecordForm(forms.ModelForm):
                 cleaned_data["customer"] = customer
             else:
                 cleaned_data["customer"] = None
-                self.add_error("customer_input", "Customer is required for sale records.")
         else:
             cleaned_data["payment_status"] = None
             cleaned_data["customer"] = None
@@ -900,7 +911,13 @@ class BambooRecordForm(forms.ModelForm):
             if quantity not in (None, "") and price_per_unit not in (None, ""):
                 sale_income = (Decimal(str(quantity)) * Decimal(str(price_per_unit))).quantize(Decimal("0.01"))
                 cleaned_data["sale_income"] = sale_income
-                normalized_paid = Decimal("0.00") if paid_amount in (None, "") else Decimal(str(paid_amount))
+                
+                # Auto-populate paid_amount if user selected "Paid" status but left amount empty
+                if payment_status == RecordStatus.PAID and paid_amount in (None, "", "0", "0.00"):
+                    normalized_paid = sale_income
+                else:
+                    normalized_paid = Decimal("0.00") if paid_amount in (None, "") else Decimal(str(paid_amount))
+                
                 if normalized_paid < 0:
                     self.add_error("paid_amount", "Paid amount cannot be negative.")
                 if normalized_paid > sale_income:
@@ -921,7 +938,7 @@ class BambooRecordForm(forms.ModelForm):
         self.fields["sale_income"].help_text = "Auto-calculated from quantity × price"
         self.fields["payment_status"].required = False
         self.fields["payment_status"].label = "Payment Status"
-        self.fields["payment_status"].help_text = "Sale records only"
+        self.fields["payment_status"].help_text = "Sale records only. Mark as Paid to auto-fill the amount or enter partial payment."
         self.fields["customer"].required = False
         self.fields["customer"].queryset = Customer.objects.order_by("name")
         self.fields["customer"].help_text = "Optional. You can assign a customer for sale records."
@@ -937,6 +954,7 @@ class BambooRecordForm(forms.ModelForm):
         self.fields["price_per_unit"].required = False
         self.fields["paid_amount"].required = False
         self.fields["paid_amount"].initial = self.initial.get("paid_amount", Decimal("0.00"))
+        self.fields["paid_amount"].help_text = "Leave empty or zero when marking as 'Paid' to auto-fill with full sale income. Enter a partial amount to keep status as pending."
         self.fields["record_type"].label = "Record Type"
 
         for field_name, field in self.fields.items():

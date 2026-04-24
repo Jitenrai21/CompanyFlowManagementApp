@@ -92,19 +92,20 @@
         </div>
     </div>
 
-    {% if pending_sales_rows %}
+    {% if pending_payment_rows %}
     <div class="cf-table-shell" data-manual-due="{{ customer.manual_due_amount }}">
         <div class="cf-table-head">
-            <h2 class="font-semibold">Pending Payments</h2>
-            <span class="text-xs text-base-content/60">{{ pending_sales_rows|length }} item{{ pending_sales_rows|length|pluralize }}</span>
+            <h2 class="font-semibold">Total Pending Payments</h2>
+            <span class="text-xs text-base-content/60">{{ pending_payment_rows|length }} item{{ pending_payment_rows|length|pluralize }}</span>
         </div>
         <div class="overflow-x-auto">
             <table class="table table-zebra table-md">
                 <thead>
                     <tr>
-                        <th>Invoice</th>
+                        <th>Source/Type</th>
+                        <th>Reference</th>
                         <th>Date</th>
-                        <th>Items</th>
+                        <th>Details</th>
                         <th>Total</th>
                         <th>Paid</th>
                         <th>Due</th>
@@ -112,38 +113,33 @@
                     </tr>
                 </thead>
                 <tbody>
-                    {% for row in pending_sales_rows %}
-                    <tr data-pending-row="true" data-total-amount="{{ row.sale.total_amount }}" data-paid-amount="{{ row.sale.paid_amount }}" data-due-amount="{{ row.due_amount }}">
-                        <td><a href="{% url 'sale_detail' row.sale.id %}" class="link link-primary">{{ row.sale.invoice_number }}</a></td>
-                        <td>{{ row.sale.date|calendar_date:request }}</td>
+                    {% for row in pending_payment_rows %}
+                    <tr data-pending-row="true" data-total-amount="{{ row.total }}" data-paid-amount="{{ row.paid }}" data-due-amount="{{ row.due }}">
                         <td>
-                            {% if row.sale.items %}
-                                <div class="space-y-1 text-xs leading-tight">
-                                    {% for item in row.sale.items %}
-                                        <div>
-                                            <span class="font-medium">{{ item.item }}</span>
-                                            <span class="text-base-content/60">x{{ item.quantity|default:1 }}</span>
-                                        </div>
-                                    {% endfor %}
-                                </div>
+                            <div class="font-medium">{{ row.source }}</div>
+                            <div class="text-xs text-base-content/60">{{ row.kind|title }}</div>
+                        </td>
+                        <td>
+                            {% if row.sale_id %}
+                            <a href="{% url 'sale_detail' row.sale_id %}" class="link link-primary">{{ row.reference }}</a>
                             {% else %}
-                                <span class="text-base-content/60">No items</span>
+                            {{ row.reference }}
                             {% endif %}
                         </td>
-                        <td>NPR {{ row.sale.total_amount|npr_amount }}</td>
-                        <td>NPR {{ row.sale.paid_amount|npr_amount }}</td>
-                        <td class="font-semibold text-error">NPR {{ row.due_amount|npr_amount }}</td>
+                        <td>{{ row.date|calendar_date:request }}</td>
+                        <td>{{ row.details }}</td>
+                        <td>NPR {{ row.total|npr_amount }}</td>
+                        <td>NPR {{ row.paid|npr_amount }}</td>
+                        <td class="font-semibold text-error">NPR {{ row.due|npr_amount }}</td>
                         <td>
-                            <span class="badge badge-warning badge-outline">
-                                {{ row.sale.get_status_display }}
-                            </span>
+                            <span class="badge badge-warning badge-outline">{{ row.status }}</span>
                         </td>
                     </tr>
                     {% endfor %}
                 </tbody>
                 <tfoot class="text-base">
                     <tr>
-                        <td colspan="5" class="text-right pr-4">Total Due:</td>
+                        <td colspan="6" class="text-right pr-4">Total Due:</td>
                         <td class="font-semibold text-error">
                             <span id="pending-total-due">NPR {{ due_amount|npr_amount }}</span>
                         </td>
@@ -152,46 +148,13 @@
                 </tfoot>
             </table>
         </div>
-        
+
         {% if customer.manual_due_amount > 0 %}
         <div class="alert alert-info">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="h-6 w-6 shrink-0 stroke-current"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
             <span>
-                Total Due includes <strong>NPR {{ customer.manual_due_amount|npr_amount }}</strong> from legacy manual adjustments plus pending sale dues from above.
+                Total Due includes <strong>NPR {{ customer.manual_due_amount|npr_amount }}</strong> from legacy manual adjustments plus pending dues listed above.
             </span>
-        </div>
-        {% endif %}
-
-        {% if pending_material_rows %}
-        <div class="cf-table-shell">
-            <div class="cf-table-head">
-                <h2 class="font-semibold">Pending Module Sales</h2>
-                <span class="text-xs text-base-content/60">{{ pending_material_rows|length }} item{{ pending_material_rows|length|pluralize }}</span>
-            </div>
-            <div class="overflow-x-auto">
-                <table class="table table-zebra table-md">
-                    <thead>
-                        <tr>
-                            <th>Module</th>
-                            <th>Record</th>
-                            <th>Date</th>
-                            <th>Details</th>
-                            <th>Pending</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for row in pending_material_rows %}
-                        <tr>
-                            <td>{{ row.label }}</td>
-                            <td>#{{ row.record.id }}</td>
-                            <td>{{ row.record.date|calendar_date:request }}</td>
-                            <td>{{ row.descriptor }}</td>
-                            <td class="font-semibold text-error">NPR {{ row.pending_amount|npr_amount }}</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
         </div>
         {% endif %}
     </div>
