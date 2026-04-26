@@ -327,6 +327,9 @@ class AlertType(models.TextChoices):
 
 class AlertSource(models.TextChoices):
     SALE = "sale", "Sale"
+    BLOCKS_SALE = "blocks_sale", "Blocks Sale"
+    CEMENT_SALE = "cement_sale", "Cement Sale"
+    BAMBOO_SALE = "bamboo_sale", "Bamboo Sale"
     TRANSACTION = "transaction", "Transaction"
     MANUAL = "manual", "Manual"
 
@@ -496,6 +499,9 @@ class BlocksRecord(TimeStampedModel):
         null=True,
         help_text="Auto-calculated: quantity × price (for sale records)"
     )
+    due_date = models.DateField(blank=True, null=True)
+    bs_due_date = models.CharField(max_length=10, blank=True, null=True, db_index=True)
+    alert_enabled = models.BooleanField(default=False)
     paid_amount = models.DecimalField(max_digits=14, decimal_places=2, default=0)
     pending_amount = models.DecimalField(max_digits=14, decimal_places=2, default=0)
     
@@ -540,6 +546,8 @@ class BlocksRecord(TimeStampedModel):
                 self.payment_status = RecordStatus.PENDING
         else:
             self.payment_status = None
+            self.alert_enabled = False
+            self.due_date = None
         if self.record_type == BlocksRecordType.SALE:
             if self.quantity and self.price_per_unit:
                 quantity_decimal = Decimal(str(self.quantity))
@@ -556,11 +564,15 @@ class BlocksRecord(TimeStampedModel):
             self.paid_amount = paid_amount
             self.pending_amount = max(total_amount - paid_amount, Decimal("0.00")).quantize(Decimal("0.01"))
             self.payment_status = RecordStatus.PAID if total_amount > 0 and self.pending_amount == 0 else RecordStatus.PENDING
+            if self.payment_status == RecordStatus.PAID:
+                self.alert_enabled = False
+                self.due_date = None
         else:
             self.paid_amount = Decimal("0.00")
             self.pending_amount = Decimal("0.00")
 
         self.bs_date = ad_to_bs_string(self.date)
+        self.bs_due_date = ad_to_bs_string(self.due_date)
         
         super().save(*args, **kwargs)
     
@@ -636,6 +648,9 @@ class CementRecord(TimeStampedModel):
         null=True,
         help_text="Auto-calculated: quantity × price (for sale records)",
     )
+    due_date = models.DateField(blank=True, null=True)
+    bs_due_date = models.CharField(max_length=10, blank=True, null=True, db_index=True)
+    alert_enabled = models.BooleanField(default=False)
     paid_amount = models.DecimalField(max_digits=14, decimal_places=2, default=0)
     pending_amount = models.DecimalField(max_digits=14, decimal_places=2, default=0)
 
@@ -679,6 +694,8 @@ class CementRecord(TimeStampedModel):
                 self.payment_status = RecordStatus.PENDING
         else:
             self.payment_status = None
+            self.alert_enabled = False
+            self.due_date = None
         if self.record_type == CementRecordType.SALE:
             if self.quantity and self.price_per_unit:
                 quantity_decimal = Decimal(str(self.quantity))
@@ -695,11 +712,15 @@ class CementRecord(TimeStampedModel):
             self.paid_amount = paid_amount
             self.pending_amount = max(total_amount - paid_amount, Decimal("0.00")).quantize(Decimal("0.01"))
             self.payment_status = RecordStatus.PAID if total_amount > 0 and self.pending_amount == 0 else RecordStatus.PENDING
+            if self.payment_status == RecordStatus.PAID:
+                self.alert_enabled = False
+                self.due_date = None
         else:
             self.paid_amount = Decimal("0.00")
             self.pending_amount = Decimal("0.00")
 
         self.bs_date = ad_to_bs_string(self.date)
+        self.bs_due_date = ad_to_bs_string(self.due_date)
 
         super().save(*args, **kwargs)
 
@@ -766,6 +787,9 @@ class BambooRecord(TimeStampedModel):
         null=True,
         help_text="Auto-calculated: quantity × price (for sale records)",
     )
+    due_date = models.DateField(blank=True, null=True)
+    bs_due_date = models.CharField(max_length=10, blank=True, null=True, db_index=True)
+    alert_enabled = models.BooleanField(default=False)
     paid_amount = models.DecimalField(max_digits=14, decimal_places=2, default=0)
     pending_amount = models.DecimalField(max_digits=14, decimal_places=2, default=0)
 
@@ -801,6 +825,8 @@ class BambooRecord(TimeStampedModel):
                 self.payment_status = RecordStatus.PENDING
         else:
             self.payment_status = None
+            self.alert_enabled = False
+            self.due_date = None
         if self.record_type == BambooRecordType.SALE:
             if self.quantity and self.price_per_unit:
                 quantity_decimal = Decimal(str(self.quantity))
@@ -817,11 +843,15 @@ class BambooRecord(TimeStampedModel):
             self.paid_amount = paid_amount
             self.pending_amount = max(total_amount - paid_amount, Decimal("0.00")).quantize(Decimal("0.01"))
             self.payment_status = RecordStatus.PAID if total_amount > 0 and self.pending_amount == 0 else RecordStatus.PENDING
+            if self.payment_status == RecordStatus.PAID:
+                self.alert_enabled = False
+                self.due_date = None
         else:
             self.paid_amount = Decimal("0.00")
             self.pending_amount = Decimal("0.00")
 
         self.bs_date = ad_to_bs_string(self.date)
+        self.bs_due_date = ad_to_bs_string(self.due_date)
 
         super().save(*args, **kwargs)
 

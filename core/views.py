@@ -11,6 +11,7 @@ from django.db.models import Case, CharField, DecimalField, ExpressionWrapper, F
 from django.db.models.functions import Coalesce
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.utils import timezone
 
@@ -267,12 +268,66 @@ def _sales_alert_queryset():
 			due_date__isnull=False,
 		)
 		.annotate(
-		received_total=Coalesce(
-			Sum("receipts__amount", filter=Q(receipts__type=TransactionType.INCOME)),
-			Value(Decimal("0.00")),
+			received_total=Coalesce(
+				Sum("receipts__amount", filter=Q(receipts__type=TransactionType.INCOME)),
+				Value(Decimal("0.00")),
+			)
 		)
 	)
+
+
+def _material_alert_queryset(model, sale_record_type):
+	return model.objects.select_related("customer").filter(
+		record_type=sale_record_type,
+		payment_status=RecordStatus.PENDING,
+		alert_enabled=True,
+		due_date__isnull=False,
 	)
+
+
+def _append_material_alert_items(alert_items, queryset, source, title_prefix, detail_url_name, alert_type, today, upcoming_end, date_from="", date_to="", customer_id=""):
+	if customer_id == UNASSIGNED_CUSTOMER_FILTER:
+		queryset = queryset.filter(customer__isnull=True)
+	elif customer_id:
+		queryset = queryset.filter(customer_id=customer_id)
+	if date_from:
+		queryset = queryset.filter(due_date__gte=date_from)
+	if date_to:
+		queryset = queryset.filter(due_date__lte=date_to)
+
+	for record in queryset:
+		amount = record.pending_amount or Decimal("0.00")
+		if amount <= 0:
+			continue
+
+		state = ""
+		if record.due_date < today:
+			state = AlertType.OVERDUE
+		elif today <= record.due_date <= upcoming_end:
+			state = AlertType.UPCOMING
+
+		if not state:
+			continue
+		if alert_type and state != alert_type:
+			continue
+
+		customer_name = record.customer.name if record.customer else "Unassigned"
+		alert_items.append(
+			{
+				"state": state,
+				"source": source,
+				"due_date": record.due_date,
+				"customer": record.customer,
+				"title": f"{title_prefix} Sale #{record.id}",
+				"invoice_number": f"{title_prefix.upper()}-{record.id}",
+				"sale_description": record.notes,
+				"amount": amount,
+				"status_label": "Pending",
+				"object_id": record.id,
+				"detail_url": reverse(detail_url_name, args=[record.id]),
+				"details": f"{title_prefix} sale pending for {customer_name}",
+			}
+		)
 
 
 def _build_alert_items(alert_type="", customer_id="", date_from="", date_to=""):
@@ -319,8 +374,50 @@ def _build_alert_items(alert_type="", customer_id="", date_from="", date_to=""):
 				"amount": sale.total_amount - sale.received_total,
 				"status_label": sale.payment_status.title(),
 				"object_id": sale.id,
+				"detail_url": reverse("sale_detail", args=[sale.id]),
+				"details": sale.notes,
 			}
 		)
+
+	_append_material_alert_items(
+		alert_items,
+		_material_alert_queryset(BlocksRecord, BlocksRecordType.SALE),
+		AlertSource.BLOCKS_SALE,
+		"Blocks",
+		"blocks_record_edit",
+		alert_type,
+		today,
+		upcoming_end,
+		date_from=date_from,
+		date_to=date_to,
+		customer_id=customer_id,
+	)
+	_append_material_alert_items(
+		alert_items,
+		_material_alert_queryset(CementRecord, CementRecordType.SALE),
+		AlertSource.CEMENT_SALE,
+		"Cement",
+		"cement_record_edit",
+		alert_type,
+		today,
+		upcoming_end,
+		date_from=date_from,
+		date_to=date_to,
+		customer_id=customer_id,
+	)
+	_append_material_alert_items(
+		alert_items,
+		_material_alert_queryset(BambooRecord, BambooRecordType.SALE),
+		AlertSource.BAMBOO_SALE,
+		"Bamboo",
+		"bamboo_record_edit",
+		alert_type,
+		today,
+		upcoming_end,
+		date_from=date_from,
+		date_to=date_to,
+		customer_id=customer_id,
+	)
 
 	manual_alerts = AlertNotification.objects.select_related("customer").filter(
 		source_type=AlertSource.MANUAL,
@@ -353,6 +450,8 @@ def _build_alert_items(alert_type="", customer_id="", date_from="", date_to=""):
 				"amount": manual_alert.amount,
 				"status_label": "Manual",
 				"object_id": manual_alert.id,
+				"detail_url": reverse("manual_alert_edit", args=[manual_alert.id]),
+				"details": manual_alert.message,
 			}
 		)
 
@@ -708,9 +807,8 @@ def _dashboard_context(request=None, date_from="", date_to=""):
 	}
 	blocks_summary["net_value"] = blocks_summary["total_sale_income"] - blocks_summary["total_investment"]
 	
-	# Calculate available stock by unit type
-	from django.db import models as django_models
-	stock_by_unit = blocks_queryset.filter(
+	# Stock KPIs are all-time (independent from dashboard date filters).
+	stock_by_unit = BlocksRecord.objects.filter(
 		record_type=BlocksRecordType.STOCK
 	).values("unit_type").annotate(
 		total_quantity=Coalesce(Sum("quantity"), Value(0))
@@ -726,7 +824,7 @@ def _dashboard_context(request=None, date_from="", date_to=""):
 	)
 	
 	# Deduct sold quantities
-	sold_by_unit = blocks_queryset.filter(
+	sold_by_unit = BlocksRecord.objects.filter(
 		record_type=BlocksRecordType.SALE
 	).values("unit_type").annotate(
 		total_quantity=Coalesce(Sum("quantity"), Value(0))
@@ -769,7 +867,7 @@ def _dashboard_context(request=None, date_from="", date_to=""):
 		"total_sale_income": cement_summary_raw["total_sale_income"],
 	}
 	cement_summary["net_value"] = cement_summary["total_sale_income"] - cement_summary["total_investment"]
-	cement_stock_by_unit = cement_queryset.filter(
+	cement_stock_by_unit = CementRecord.objects.filter(
 		record_type=CementRecordType.STOCK
 	).values("unit_type").annotate(
 		total_quantity=Coalesce(Sum("quantity"), Value(0))
@@ -782,7 +880,7 @@ def _dashboard_context(request=None, date_from="", date_to=""):
 		(row["total_quantity"] for row in cement_stock_by_unit if row["unit_type"] == CementUnitType.OPC),
 		0,
 	)
-	cement_sold_by_unit = cement_queryset.filter(
+	cement_sold_by_unit = CementRecord.objects.filter(
 		record_type=CementRecordType.SALE
 	).values("unit_type").annotate(
 		total_quantity=Coalesce(Sum("quantity"), Value(0))
@@ -822,12 +920,13 @@ def _dashboard_context(request=None, date_from="", date_to=""):
 		"total_sale_income": bamboo_summary_raw["total_sale_income"],
 	}
 	bamboo_summary["net_value"] = bamboo_summary["total_sale_income"] - bamboo_summary["total_investment"]
-	bamboo_stock_total = bamboo_queryset.filter(record_type=BambooRecordType.STOCK).aggregate(
+	bamboo_stock_total = BambooRecord.objects.filter(record_type=BambooRecordType.STOCK).aggregate(
 		total_quantity=Coalesce(Sum("quantity"), Value(0))
 	)["total_quantity"]
-	bamboo_sold_total = bamboo_queryset.filter(record_type=BambooRecordType.SALE).aggregate(
+	bamboo_sold_total = BambooRecord.objects.filter(record_type=BambooRecordType.SALE).aggregate(
 		total_quantity=Coalesce(Sum("quantity"), Value(0))
 	)["total_quantity"]
+	bamboo_summary["total_sold_units"] = bamboo_sold_total
 	bamboo_summary["available_stock"] = bamboo_stock_total - bamboo_sold_total
 	bamboo_summary_values = [
 		float(bamboo_summary["total_investment"]),
@@ -3186,9 +3285,29 @@ def blocks_record_mark_paid(request, pk):
 		return _redirect_to_next_or_default(request, "blocks_records")
 
 	blocks_record.paid_amount = blocks_record.sale_income or Decimal("0.00")
+	blocks_record.alert_enabled = False
+	blocks_record.due_date = None
 	blocks_record.save()
 	_reconcile_material_sale_income_transaction(blocks_record)
 	messages.success(request, f"Blocks sale record on {blocks_record.date} marked as paid.")
+	return _redirect_to_next_or_default(request, "blocks_records")
+
+
+@login_required
+def blocks_record_toggle_alert(request, pk):
+	blocks_record = get_object_or_404(BlocksRecord, pk=pk)
+
+	if request.method != "POST":
+		return _redirect_to_next_or_default(request, "blocks_records")
+
+	if blocks_record.record_type != BlocksRecordType.SALE or blocks_record.payment_status != RecordStatus.PENDING:
+		messages.error(request, "Alert status can only be changed for pending blocks sales.")
+		return _redirect_to_next_or_default(request, "blocks_records")
+
+	blocks_record.alert_enabled = not blocks_record.alert_enabled
+	blocks_record.save(update_fields=["alert_enabled", "updated_at"])
+	state_label = "enabled" if blocks_record.alert_enabled else "disabled"
+	messages.success(request, f"Alerts {state_label} for blocks sale #{blocks_record.id}.")
 	return _redirect_to_next_or_default(request, "blocks_records")
 
 
@@ -3362,9 +3481,29 @@ def cement_record_mark_paid(request, pk):
 		return _redirect_to_next_or_default(request, "cement_records")
 
 	cement_record.paid_amount = cement_record.sale_income or Decimal("0.00")
+	cement_record.alert_enabled = False
+	cement_record.due_date = None
 	cement_record.save()
 	_reconcile_material_sale_income_transaction(cement_record)
 	messages.success(request, f"Cement sale record on {cement_record.date} marked as paid.")
+	return _redirect_to_next_or_default(request, "cement_records")
+
+
+@login_required
+def cement_record_toggle_alert(request, pk):
+	cement_record = get_object_or_404(CementRecord, pk=pk)
+
+	if request.method != "POST":
+		return _redirect_to_next_or_default(request, "cement_records")
+
+	if cement_record.record_type != CementRecordType.SALE or cement_record.payment_status != RecordStatus.PENDING:
+		messages.error(request, "Alert status can only be changed for pending cement sales.")
+		return _redirect_to_next_or_default(request, "cement_records")
+
+	cement_record.alert_enabled = not cement_record.alert_enabled
+	cement_record.save(update_fields=["alert_enabled", "updated_at"])
+	state_label = "enabled" if cement_record.alert_enabled else "disabled"
+	messages.success(request, f"Alerts {state_label} for cement sale #{cement_record.id}.")
 	return _redirect_to_next_or_default(request, "cement_records")
 
 
@@ -3533,9 +3672,29 @@ def bamboo_record_mark_paid(request, pk):
 		return _redirect_to_next_or_default(request, "bamboo_records")
 
 	bamboo_record.paid_amount = bamboo_record.sale_income or Decimal("0.00")
+	bamboo_record.alert_enabled = False
+	bamboo_record.due_date = None
 	bamboo_record.save()
 	_reconcile_material_sale_income_transaction(bamboo_record)
 	messages.success(request, f"Bamboo sale record on {bamboo_record.date} marked as paid.")
+	return _redirect_to_next_or_default(request, "bamboo_records")
+
+
+@login_required
+def bamboo_record_toggle_alert(request, pk):
+	bamboo_record = get_object_or_404(BambooRecord, pk=pk)
+
+	if request.method != "POST":
+		return _redirect_to_next_or_default(request, "bamboo_records")
+
+	if bamboo_record.record_type != BambooRecordType.SALE or bamboo_record.payment_status != RecordStatus.PENDING:
+		messages.error(request, "Alert status can only be changed for pending bamboo sales.")
+		return _redirect_to_next_or_default(request, "bamboo_records")
+
+	bamboo_record.alert_enabled = not bamboo_record.alert_enabled
+	bamboo_record.save(update_fields=["alert_enabled", "updated_at"])
+	state_label = "enabled" if bamboo_record.alert_enabled else "disabled"
+	messages.success(request, f"Alerts {state_label} for bamboo sale #{bamboo_record.id}.")
 	return _redirect_to_next_or_default(request, "bamboo_records")
 
 

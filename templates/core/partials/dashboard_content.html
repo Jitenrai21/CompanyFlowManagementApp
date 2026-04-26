@@ -358,11 +358,16 @@
                         </div>
                     </div>
                 </div>
-                <div class="grid gap-3 sm:grid-cols-1">
+                <div class="grid gap-3 sm:grid-cols-2">
                     <div class="cf-kpi-card cf-kpi-card--receivable">
                         <p class="kpi-label !mt-0">Available Stock</p>
                         <p class="kpi-value !mt-0">{{ bamboo_summary.available_stock }}</p>
                         <p class="kpi-note">Stock additions minus sold quantity</p>
+                    </div>
+                    <div class="cf-kpi-card cf-kpi-card--sales">
+                        <p class="kpi-label !mt-0">Total Sold Units</p>
+                        <p class="kpi-value !mt-0">{{ bamboo_summary.total_sold_units }}</p>
+                        <p class="kpi-note">Total units sold in selected period</p>
                     </div>
                 </div>
             </div>

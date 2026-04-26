@@ -19,6 +19,7 @@
                     <th>Paid</th>
                     <th>Pending</th>
                     <th>Notes</th>
+                    <th class="text-center whitespace-nowrap">Alert</th>
                     <th class="text-right whitespace-nowrap">Actions</th>
                 </tr>
             </thead>
@@ -97,6 +98,15 @@
                             <span class="text-base-content/50 italic">No notes</span>
                         {% endif %}
                     </td>
+                    <td class="align-middle text-center">
+                        {% if record.record_type == 'sale' and record.payment_status == 'pending' %}
+                        <span class="badge badge-sm badge-outline whitespace-nowrap inline-flex min-w-[5.75rem] justify-center {% if record.alert_enabled %}badge-error{% else %}badge-ghost{% endif %}">
+                            Alert {% if record.alert_enabled %}On{% else %}Off{% endif %}
+                        </span>
+                        {% else %}
+                        <span class="text-base-content/40">N/A</span>
+                        {% endif %}
+                    </td>
                     <td class="text-right align-middle">
                         <div class="inline-flex min-h-8 items-center justify-end gap-1 whitespace-nowrap">
                             <div class="hidden md:flex items-center justify-end gap-1">
@@ -109,6 +119,13 @@
                                     <input type="hidden" name="next" value="{{ request.get_full_path }}">
                                     <button type="submit" class="btn btn-xs btn-square btn-success btn-outline" title="Mark paid" aria-label="Mark blocks record {{ record.id }} as paid">
                                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-3.5 w-3.5" aria-hidden="true"><path fill-rule="evenodd" d="M16.704 5.29a1 1 0 010 1.42l-7.5 7.5a1 1 0 01-1.415.005l-3.5-3.4a1 1 0 011.394-1.434l2.793 2.714 6.803-6.805a1 1 0 011.425 0z" clip-rule="evenodd" /></svg>
+                                    </button>
+                                </form>
+                                <form method="post" action="{% url 'blocks_record_toggle_alert' record.id %}" class="inline">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                    <button type="submit" class="btn btn-xs btn-square {% if record.alert_enabled %}btn-warning{% else %}btn-info{% endif %} btn-outline" title="Toggle alert" aria-label="Toggle alert for blocks record {{ record.id }}">
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-3.5 w-3.5" aria-hidden="true"><path d="M10 2a4 4 0 00-4 4v2.35c0 .69-.28 1.35-.78 1.84L4 11.41V13h12v-1.59l-1.22-1.22a2.6 2.6 0 01-.78-1.84V6a4 4 0 00-4-4z" /><path d="M8.5 15a1.5 1.5 0 003 0h-3z" /></svg>
                                     </button>
                                 </form>
                                 {% endif %}
@@ -137,6 +154,13 @@
                                             <input type="hidden" name="next" value="{{ request.get_full_path }}">
                                             <button type="submit" class="btn btn-xs btn-success btn-outline w-full justify-start">Mark Paid</button>
                                         </form>
+                                        <form method="post" action="{% url 'blocks_record_toggle_alert' record.id %}">
+                                            {% csrf_token %}
+                                            <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                            <button type="submit" class="btn btn-xs {% if record.alert_enabled %}btn-warning{% else %}btn-info{% endif %} btn-outline w-full justify-start">
+                                                Alert {% if record.alert_enabled %}Off{% else %}On{% endif %}
+                                            </button>
+                                        </form>
                                         {% endif %}
                                         <form method="post"
                                               action="{% url 'blocks_record_delete' record.id %}"
@@ -155,7 +179,7 @@
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="12" class="text-center py-8">
+                    <td colspan="13" class="text-center py-8">
                         <div class="space-y-2">
                             <p class="text-base-content/70">No blocks records found.</p>
                             <a href="{% url 'blocks_record_create' %}" class="btn btn-sm btn-primary">Create First Record</a>
@@ -167,19 +191,35 @@
         </table>
     </div>
 
-    {% if page_obj.has_other_pages %}
-    <div class="cf-pagination">
-        {% if page_obj.has_previous %}
-            <a href="?page=1{% if filters.q %}&q={{ filters.q|urlencode }}{% endif %}{% if filters.record_type %}&record_type={{ filters.record_type }}{% endif %}{% if filters.payment_status %}&payment_status={{ filters.payment_status }}{% endif %}{% if filters.unit_type %}&unit_type={{ filters.unit_type }}{% endif %}{% if filters.date_from %}&date_from={{ filters.date_from }}{% endif %}{% if filters.date_to %}&date_to={{ filters.date_to }}{% endif %}{% if filters.sort %}&sort={{ filters.sort }}{% endif %}" class="btn btn-sm btn-outline">First</a>
-            <a href="?page={{ page_obj.previous_page_number }}{% if filters.q %}&q={{ filters.q|urlencode }}{% endif %}{% if filters.record_type %}&record_type={{ filters.record_type }}{% endif %}{% if filters.payment_status %}&payment_status={{ filters.payment_status }}{% endif %}{% if filters.unit_type %}&unit_type={{ filters.unit_type }}{% endif %}{% if filters.date_from %}&date_from={{ filters.date_from }}{% endif %}{% if filters.date_to %}&date_to={{ filters.date_to }}{% endif %}{% if filters.sort %}&sort={{ filters.sort }}{% endif %}" class="btn btn-sm btn-outline">Previous</a>
-        {% endif %}
-
-        <span class="text-sm">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
-
-        {% if page_obj.has_next %}
-            <a href="?page={{ page_obj.next_page_number }}{% if filters.q %}&q={{ filters.q|urlencode }}{% endif %}{% if filters.record_type %}&record_type={{ filters.record_type }}{% endif %}{% if filters.payment_status %}&payment_status={{ filters.payment_status }}{% endif %}{% if filters.unit_type %}&unit_type={{ filters.unit_type }}{% endif %}{% if filters.date_from %}&date_from={{ filters.date_from }}{% endif %}{% if filters.date_to %}&date_to={{ filters.date_to }}{% endif %}{% if filters.sort %}&sort={{ filters.sort }}{% endif %}" class="btn btn-sm btn-outline">Next</a>
-            <a href="?page={{ page_obj.paginator.num_pages }}{% if filters.q %}&q={{ filters.q|urlencode }}{% endif %}{% if filters.record_type %}&record_type={{ filters.record_type }}{% endif %}{% if filters.payment_status %}&payment_status={{ filters.payment_status }}{% endif %}{% if filters.unit_type %}&unit_type={{ filters.unit_type }}{% endif %}{% if filters.date_from %}&date_from={{ filters.date_from }}{% endif %}{% if filters.date_to %}&date_to={{ filters.date_to }}{% endif %}{% if filters.sort %}&sort={{ filters.sort }}{% endif %}" class="btn btn-sm btn-outline">Last</a>
-        {% endif %}
+    {% if page_obj.paginator.num_pages > 1 %}
+    <div class="flex items-center justify-between gap-2 px-4 py-3 border-t border-base-300/70">
+        <p class="text-xs text-base-content/70">
+            Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+        </p>
+        <div class="join">
+            {% if page_obj.has_previous %}
+            <a
+                href="{% url 'blocks_records' %}?q={{ filters.q|urlencode }}&record_type={{ filters.record_type }}&payment_status={{ filters.payment_status }}&unit_type={{ filters.unit_type }}&date_from={{ filters.date_from }}&date_to={{ filters.date_to }}&sort={{ filters.sort }}&page={{ page_obj.previous_page_number }}"
+                hx-get="{% url 'blocks_records' %}?q={{ filters.q|urlencode }}&record_type={{ filters.record_type }}&payment_status={{ filters.payment_status }}&unit_type={{ filters.unit_type }}&date_from={{ filters.date_from }}&date_to={{ filters.date_to }}&sort={{ filters.sort }}&page={{ page_obj.previous_page_number }}"
+                hx-target="#blocks-table-container"
+                hx-push-url="true"
+                class="btn btn-sm join-item"
+            >Previous</a>
+            {% else %}
+            <button class="btn btn-sm join-item" disabled>Previous</button>
+            {% endif %}
+            {% if page_obj.has_next %}
+            <a
+                href="{% url 'blocks_records' %}?q={{ filters.q|urlencode }}&record_type={{ filters.record_type }}&payment_status={{ filters.payment_status }}&unit_type={{ filters.unit_type }}&date_from={{ filters.date_from }}&date_to={{ filters.date_to }}&sort={{ filters.sort }}&page={{ page_obj.next_page_number }}"
+                hx-get="{% url 'blocks_records' %}?q={{ filters.q|urlencode }}&record_type={{ filters.record_type }}&payment_status={{ filters.payment_status }}&unit_type={{ filters.unit_type }}&date_from={{ filters.date_from }}&date_to={{ filters.date_to }}&sort={{ filters.sort }}&page={{ page_obj.next_page_number }}"
+                hx-target="#blocks-table-container"
+                hx-push-url="true"
+                class="btn btn-sm join-item"
+            >Next</a>
+            {% else %}
+            <button class="btn btn-sm join-item" disabled>Next</button>
+            {% endif %}
+        </div>
     </div>
     {% endif %}
 </div>

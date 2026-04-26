@@ -84,6 +84,18 @@
                     {% if form.paid_amount.errors %}<p class="text-error text-sm mt-1">{{ form.paid_amount.errors|join:', ' }}</p>{% endif %}
                     <p class="text-xs text-base-content/60 mt-1">{{ form.paid_amount.help_text }}</p>
                 </div>
+                <div id="due-date-field" class="form-control md:col-span-2 hidden">
+                    <label class="label" for="id_due_date"><span class="label-text">Due Date</span></label>
+                    {{ form.due_date }}
+                    {% if form.due_date.errors %}<p class="text-error text-sm mt-1">{{ form.due_date.errors|join:', ' }}</p>{% endif %}
+                </div>
+                <div id="alert-enabled-field" class="form-control md:col-span-2 hidden">
+                    <label class="label cursor-pointer justify-start gap-3" for="id_alert_enabled">
+                        {{ form.alert_enabled }}
+                        <span class="label-text">Enable overdue alerts for this sale when pending</span>
+                    </label>
+                    {% if form.alert_enabled.errors %}<p class="text-error text-sm mt-1">{{ form.alert_enabled.errors|join:', ' }}</p>{% endif %}
+                </div>
                 <div id="customer-field" class="form-control md:col-span-2 hidden">
                     <label class="label" for="id_customer_input"><span class="label-text">Customer Assignment (Optional)</span></label>
                     {{ form.customer_input }}
@@ -120,6 +132,10 @@
     const customerInput = document.getElementById('id_customer_input');
     const paidAmountField = document.getElementById('paid-amount-field');
     const paidAmountInput = document.getElementById('id_paid_amount');
+    const dueDateField = document.getElementById('due-date-field');
+    const dueDateInput = document.getElementById('id_due_date');
+    const alertEnabledField = document.getElementById('alert-enabled-field');
+    const alertEnabledInput = document.getElementById('id_alert_enabled');
 
     function getSaleIncome() {
         const saleIncomeInput = document.getElementById('id_sale_income');
@@ -139,24 +155,35 @@
     }
 
     function togglePaymentStatusField() {
-        if (!recordTypeInput || !paymentStatusField || !paymentStatusInput || !customerField || !customerInput || !paidAmountField || !paidAmountInput) {
+        if (!recordTypeInput || !paymentStatusField || !paymentStatusInput || !customerField || !customerInput || !paidAmountField || !paidAmountInput || !dueDateField || !dueDateInput || !alertEnabledField || !alertEnabledInput) {
             return;
         }
         const isSale = recordTypeInput.value === 'sale';
+        const isPaid = paymentStatusInput.value === 'paid';
         paymentStatusField.classList.toggle('hidden', !isSale);
         customerField.classList.toggle('hidden', !isSale);
         paidAmountField.classList.toggle('hidden', !isSale);
+        dueDateField.classList.toggle('hidden', !isSale);
+        alertEnabledField.classList.toggle('hidden', !isSale || isPaid);
+        dueDateInput.disabled = !isSale || isPaid;
+        alertEnabledInput.disabled = !isSale || isPaid;
         customerInput.required = false;
         if (isSale && !paymentStatusInput.value) {
             paymentStatusInput.value = 'pending';
         }
         if (isSale) {
             syncPaidAmountWithStatus();
+            if (isPaid) {
+                dueDateInput.value = '';
+                alertEnabledInput.checked = false;
+            }
         }
         if (!isSale) {
             paymentStatusInput.value = '';
             customerInput.value = '';
             paidAmountInput.value = '0.00';
+            dueDateInput.value = '';
+            alertEnabledInput.checked = false;
         }
     }
 

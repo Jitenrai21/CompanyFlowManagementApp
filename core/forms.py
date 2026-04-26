@@ -623,16 +623,19 @@ class BlocksRecordForm(forms.ModelForm):
             "record_type",
             "customer",
             "payment_status",
+            "alert_enabled",
             "investment",
             "unit_type",
             "quantity",
             "price_per_unit",
             "sale_income",
             "paid_amount",
+            "due_date",
             "notes",
         ]
         widgets = {
             "date": forms.DateInput(attrs={"type": "date"}),
+            "due_date": forms.DateInput(attrs={"type": "date"}),
             "notes": forms.Textarea(attrs={"rows": 3, "placeholder": "Additional details or remarks"}),
             "investment": forms.NumberInput(attrs={"step": "0.01", "min": "0"}),
             "quantity": forms.NumberInput(attrs={"min": "0"}),
@@ -651,6 +654,8 @@ class BlocksRecordForm(forms.ModelForm):
         unit_type = cleaned_data.get("unit_type")
         price_per_unit = cleaned_data.get("price_per_unit")
         paid_amount = cleaned_data.get("paid_amount")
+        due_date = cleaned_data.get("due_date")
+        alert_enabled = cleaned_data.get("alert_enabled")
 
         if record_type == BlocksRecordType.SALE:
             cleaned_data["payment_status"] = payment_status or RecordStatus.PENDING
@@ -664,6 +669,8 @@ class BlocksRecordForm(forms.ModelForm):
         else:
             cleaned_data["payment_status"] = None
             cleaned_data["customer"] = None
+            cleaned_data["alert_enabled"] = False
+            cleaned_data["due_date"] = None
         
         if record_type == BlocksRecordType.INVESTMENT:
             # For INVESTMENT records, investment must be provided
@@ -702,10 +709,19 @@ class BlocksRecordForm(forms.ModelForm):
                     self.add_error("paid_amount", "Paid amount cannot exceed sale income.")
                 cleaned_data["paid_amount"] = normalized_paid
                 cleaned_data["payment_status"] = RecordStatus.PAID if sale_income > 0 and normalized_paid >= sale_income else RecordStatus.PENDING
+                if cleaned_data["payment_status"] == RecordStatus.PAID:
+                    cleaned_data["alert_enabled"] = False
+                    cleaned_data["due_date"] = None
+                elif not due_date:
+                    self.add_error("due_date", "Due date is required when sale status is Pending.")
+                elif not alert_enabled:
+                    cleaned_data["alert_enabled"] = False
         else:
             cleaned_data["paid_amount"] = Decimal("0.00")
+            cleaned_data["alert_enabled"] = False
+            cleaned_data["due_date"] = None
         
-        return _normalize_form_date_fields(self, cleaned_data, ("date",))
+        return _normalize_form_date_fields(self, cleaned_data, ("date", "due_date"))
 
     def __init__(self, *args, **kwargs):
         self.calendar_mode = _resolve_form_calendar_mode(kwargs)
@@ -717,6 +733,8 @@ class BlocksRecordForm(forms.ModelForm):
         self.fields["payment_status"].required = False
         self.fields["payment_status"].label = "Payment Status"
         self.fields["payment_status"].help_text = "Sale records only. Mark as \"Paid\" to auto-fill the amount, or enter partial payment."
+        self.fields["alert_enabled"].required = False
+        self.fields["alert_enabled"].help_text = "Sale records only. Enable alerts for pending dues."
         self.fields["customer"].required = False
         self.fields["customer"].queryset = Customer.objects.order_by("name")
         self.fields["customer"].help_text = "Optional. You can assign a customer for sale records."
@@ -732,13 +750,16 @@ class BlocksRecordForm(forms.ModelForm):
         self.fields["unit_type"].required = False
         self.fields["price_per_unit"].required = False
         self.fields["paid_amount"].required = False
+        self.fields["due_date"].required = False
         self.fields["paid_amount"].initial = self.initial.get("paid_amount", Decimal("0.00"))
         self.fields["paid_amount"].help_text = "Leave empty (or zero) when marking as \"Paid\" to auto-fill with full sale income. Enter a partial amount to keep status as pending."
         self.fields["record_type"].label = "Record Type"
+        if not self.is_bound and not self.instance.pk:
+            self.fields["due_date"].initial = timezone.localdate()
         
         for field_name, field in self.fields.items():
             _decorate_widget(field_name, field)
-        _configure_form_date_fields(self, ("date",))
+        _configure_form_date_fields(self, ("date", "due_date"))
 
 
 class CementRecordForm(forms.ModelForm):
@@ -752,16 +773,19 @@ class CementRecordForm(forms.ModelForm):
             "record_type",
             "customer",
             "payment_status",
+            "alert_enabled",
             "investment",
             "unit_type",
             "quantity",
             "price_per_unit",
             "sale_income",
             "paid_amount",
+            "due_date",
             "notes",
         ]
         widgets = {
             "date": forms.DateInput(attrs={"type": "date"}),
+            "due_date": forms.DateInput(attrs={"type": "date"}),
             "notes": forms.Textarea(attrs={"rows": 3, "placeholder": "Additional details or remarks"}),
             "investment": forms.NumberInput(attrs={"step": "0.01", "min": "0"}),
             "quantity": forms.NumberInput(attrs={"min": "0"}),
@@ -780,6 +804,8 @@ class CementRecordForm(forms.ModelForm):
         unit_type = cleaned_data.get("unit_type")
         price_per_unit = cleaned_data.get("price_per_unit")
         paid_amount = cleaned_data.get("paid_amount")
+        due_date = cleaned_data.get("due_date")
+        alert_enabled = cleaned_data.get("alert_enabled")
 
         if record_type == CementRecordType.SALE:
             cleaned_data["payment_status"] = payment_status or RecordStatus.PENDING
@@ -793,6 +819,8 @@ class CementRecordForm(forms.ModelForm):
         else:
             cleaned_data["payment_status"] = None
             cleaned_data["customer"] = None
+            cleaned_data["alert_enabled"] = False
+            cleaned_data["due_date"] = None
 
         if record_type == CementRecordType.INVESTMENT:
             if investment is None or investment <= 0:
@@ -826,10 +854,19 @@ class CementRecordForm(forms.ModelForm):
                     self.add_error("paid_amount", "Paid amount cannot exceed sale income.")
                 cleaned_data["paid_amount"] = normalized_paid
                 cleaned_data["payment_status"] = RecordStatus.PAID if sale_income > 0 and normalized_paid >= sale_income else RecordStatus.PENDING
+                if cleaned_data["payment_status"] == RecordStatus.PAID:
+                    cleaned_data["alert_enabled"] = False
+                    cleaned_data["due_date"] = None
+                elif not due_date:
+                    self.add_error("due_date", "Due date is required when sale status is Pending.")
+                elif not alert_enabled:
+                    cleaned_data["alert_enabled"] = False
         else:
             cleaned_data["paid_amount"] = Decimal("0.00")
+            cleaned_data["alert_enabled"] = False
+            cleaned_data["due_date"] = None
 
-        return _normalize_form_date_fields(self, cleaned_data, ("date",))
+        return _normalize_form_date_fields(self, cleaned_data, ("date", "due_date"))
 
     def __init__(self, *args, **kwargs):
         self.calendar_mode = _resolve_form_calendar_mode(kwargs)
@@ -841,6 +878,8 @@ class CementRecordForm(forms.ModelForm):
         self.fields["payment_status"].required = False
         self.fields["payment_status"].label = "Payment Status"
         self.fields["payment_status"].help_text = "Sale records only. Mark as Paid to auto-fill the amount or enter partial payment."
+        self.fields["alert_enabled"].required = False
+        self.fields["alert_enabled"].help_text = "Sale records only. Enable alerts for pending dues."
         self.fields["customer"].required = False
         self.fields["customer"].queryset = Customer.objects.order_by("name")
         self.fields["customer"].help_text = "Optional. You can assign a customer for sale records."
@@ -856,13 +895,16 @@ class CementRecordForm(forms.ModelForm):
         self.fields["unit_type"].required = False
         self.fields["price_per_unit"].required = False
         self.fields["paid_amount"].required = False
+        self.fields["due_date"].required = False
         self.fields["paid_amount"].initial = self.initial.get("paid_amount", Decimal("0.00"))
         self.fields["paid_amount"].help_text = "Leave empty or zero when marking as 'Paid' to auto-fill with full sale income. Enter a partial amount to keep status as pending."
         self.fields["record_type"].label = "Record Type"
+        if not self.is_bound and not self.instance.pk:
+            self.fields["due_date"].initial = timezone.localdate()
 
         for field_name, field in self.fields.items():
             _decorate_widget(field_name, field)
-        _configure_form_date_fields(self, ("date",))
+        _configure_form_date_fields(self, ("date", "due_date"))
 
 
 class BambooRecordForm(forms.ModelForm):
@@ -876,15 +918,18 @@ class BambooRecordForm(forms.ModelForm):
             "record_type",
             "customer",
             "payment_status",
+            "alert_enabled",
             "investment",
             "quantity",
             "price_per_unit",
             "sale_income",
             "paid_amount",
+            "due_date",
             "notes",
         ]
         widgets = {
             "date": forms.DateInput(attrs={"type": "date"}),
+            "due_date": forms.DateInput(attrs={"type": "date"}),
             "notes": forms.Textarea(attrs={"rows": 3, "placeholder": "Additional details or remarks"}),
             "investment": forms.NumberInput(attrs={"step": "0.01", "min": "0"}),
             "quantity": forms.NumberInput(attrs={"min": "0"}),
@@ -902,6 +947,8 @@ class BambooRecordForm(forms.ModelForm):
         quantity = cleaned_data.get("quantity")
         price_per_unit = cleaned_data.get("price_per_unit")
         paid_amount = cleaned_data.get("paid_amount")
+        due_date = cleaned_data.get("due_date")
+        alert_enabled = cleaned_data.get("alert_enabled")
 
         if record_type == BambooRecordType.SALE:
             cleaned_data["payment_status"] = payment_status or RecordStatus.PENDING
@@ -915,6 +962,8 @@ class BambooRecordForm(forms.ModelForm):
         else:
             cleaned_data["payment_status"] = None
             cleaned_data["customer"] = None
+            cleaned_data["alert_enabled"] = False
+            cleaned_data["due_date"] = None
 
         if record_type == BambooRecordType.INVESTMENT:
             if investment is None or investment <= 0:
@@ -944,10 +993,19 @@ class BambooRecordForm(forms.ModelForm):
                     self.add_error("paid_amount", "Paid amount cannot exceed sale income.")
                 cleaned_data["paid_amount"] = normalized_paid
                 cleaned_data["payment_status"] = RecordStatus.PAID if sale_income > 0 and normalized_paid >= sale_income else RecordStatus.PENDING
+                if cleaned_data["payment_status"] == RecordStatus.PAID:
+                    cleaned_data["alert_enabled"] = False
+                    cleaned_data["due_date"] = None
+                elif not due_date:
+                    self.add_error("due_date", "Due date is required when sale status is Pending.")
+                elif not alert_enabled:
+                    cleaned_data["alert_enabled"] = False
         else:
             cleaned_data["paid_amount"] = Decimal("0.00")
+            cleaned_data["alert_enabled"] = False
+            cleaned_data["due_date"] = None
 
-        return _normalize_form_date_fields(self, cleaned_data, ("date",))
+        return _normalize_form_date_fields(self, cleaned_data, ("date", "due_date"))
 
     def __init__(self, *args, **kwargs):
         self.calendar_mode = _resolve_form_calendar_mode(kwargs)
@@ -959,6 +1017,8 @@ class BambooRecordForm(forms.ModelForm):
         self.fields["payment_status"].required = False
         self.fields["payment_status"].label = "Payment Status"
         self.fields["payment_status"].help_text = "Sale records only. Mark as Paid to auto-fill the amount or enter partial payment."
+        self.fields["alert_enabled"].required = False
+        self.fields["alert_enabled"].help_text = "Sale records only. Enable alerts for pending dues."
         self.fields["customer"].required = False
         self.fields["customer"].queryset = Customer.objects.order_by("name")
         self.fields["customer"].help_text = "Optional. You can assign a customer for sale records."
@@ -973,10 +1033,13 @@ class BambooRecordForm(forms.ModelForm):
         self.fields["quantity"].required = False
         self.fields["price_per_unit"].required = False
         self.fields["paid_amount"].required = False
+        self.fields["due_date"].required = False
         self.fields["paid_amount"].initial = self.initial.get("paid_amount", Decimal("0.00"))
         self.fields["paid_amount"].help_text = "Leave empty or zero when marking as 'Paid' to auto-fill with full sale income. Enter a partial amount to keep status as pending."
         self.fields["record_type"].label = "Record Type"
+        if not self.is_bound and not self.instance.pk:
+            self.fields["due_date"].initial = timezone.localdate()
 
         for field_name, field in self.fields.items():
             _decorate_widget(field_name, field)
-        _configure_form_date_fields(self, ("date",))
+        _configure_form_date_fields(self, ("date", "due_date"))

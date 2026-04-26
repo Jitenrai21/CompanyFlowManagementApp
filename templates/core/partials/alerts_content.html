@@ -36,6 +36,12 @@
                         <td>
                             {% if item.source == 'sale' %}
                             <span class="badge badge-outline">Sale</span>
+                            {% elif item.source == 'blocks_sale' %}
+                            <span class="badge badge-outline">Blocks Sale</span>
+                            {% elif item.source == 'cement_sale' %}
+                            <span class="badge badge-outline">Cement Sale</span>
+                            {% elif item.source == 'bamboo_sale' %}
+                            <span class="badge badge-outline">Bamboo Sale</span>
                             {% elif item.source == 'manual' %}
                             <span class="badge badge-info badge-outline">Manual</span>
                             {% else %}
@@ -43,14 +49,14 @@
                             {% endif %}
                         </td>
                         <td>
-                            {% if item.source == 'sale' and item.invoice_number %}
-                            <a href="{% url 'sale_detail' item.object_id %}" class="link link-primary">{{ item.invoice_number }}</a>
+                            {% if item.detail_url and item.invoice_number %}
+                            <a href="{{ item.detail_url }}" class="link link-primary">{{ item.invoice_number }}</a>
                             {% else %}
                             <span class="text-base-content/50">&mdash;</span>
                             {% endif %}
                         </td>
                         <td>
-                            {% if item.source == 'sale' and item.sale_description %}
+                            {% if item.sale_description %}
                             {{ item.sale_description }}
                             {% else %}
                             <span class="text-base-content/50">&mdash;</span>
