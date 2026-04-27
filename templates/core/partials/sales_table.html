@@ -35,7 +35,11 @@
                                 {% for item in sale.items %}
                                     <div>
                                         <span class="font-medium">{{ item.item }}</span>
+                                        {% if item.unit %}
+                                        <span class="text-base-content/60">({{ item.unit }}) x{{ item.quantity|default:1 }}</span>
+                                        {% else %}
                                         <span class="text-base-content/60">x{{ item.quantity|default:1 }}</span>
+                                        {% endif %}
                                     </div>
                                 {% endfor %}
                             </div>

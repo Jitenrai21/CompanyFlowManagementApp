@@ -777,10 +777,54 @@ def _build_sales_definition(params, dues_only=False):
     queryset, filters = _filtered_sales(params)
     if dues_only:
         queryset = queryset.filter(remaining_balance__gt=0)
+
+    def summarize_sale_items(items):
+        if not isinstance(items, list) or not items:
+            return "", Decimal("0.00"), "", "", "0"
+
+        item_names = []
+        units_seen = []
+        item_lines = []
+        total_quantity = Decimal("0.00")
+
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+
+            name = str(item.get("item", "")).strip()
+            unit = str(item.get("unit", "")).strip()
+            raw_qty = item.get("quantity", 0)
+
+            try:
+                qty = Decimal(str(raw_qty))
+            except Exception:
+                qty = Decimal("0.00")
+
+            if name and name not in item_names:
+                item_names.append(name)
+            if unit and unit not in units_seen:
+                units_seen.append(unit)
+
+            if name:
+                qty_text = f"{qty.normalize()}" if qty != qty.to_integral_value() else str(int(qty))
+                if unit:
+                    item_lines.append(f"{name} ({unit}) x{qty_text}")
+                else:
+                    item_lines.append(f"{name} x{qty_text}")
+
+            total_quantity += qty
+
+        quantity_text = f"{total_quantity.normalize()}" if total_quantity != total_quantity.to_integral_value() else str(int(total_quantity))
+        return ", ".join(item_names), total_quantity, ", ".join(units_seen), "; ".join(item_lines), quantity_text
+
     headers = [
         "Invoice Number",
         "Date",
         "Customer",
+        "Items",
+        "Quantity Sold",
+        "Units Sold",
+        "Item Lines",
         "Status",
         "Total Amount",
         "Paid Amount",
@@ -795,10 +839,15 @@ def _build_sales_definition(params, dues_only=False):
             remaining_balance = sale.total_amount - sale.paid_amount
             if remaining_balance < 0:
                 remaining_balance = Decimal("0.00")
+            item_names, _total_qty, units_sold, item_lines, quantity_text = summarize_sale_items(sale.items)
             yield [
                 sale.invoice_number,
                 sale.date,
                 sale.customer.name if sale.customer else "",
+                item_names,
+                quantity_text,
+                units_sold,
+                item_lines,
                 sale.get_status_display(),
                 sale.total_amount,
                 sale.paid_amount,

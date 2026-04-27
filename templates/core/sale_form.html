@@ -53,19 +53,21 @@
                 {{ form.items }}
                 <div class="cf-section p-3 space-y-3">
                     <div class="overflow-x-auto">
-                        <table class="table table-sm">
+                        <table class="table table-sm min-w-[980px]">
                             <thead>
                                 <tr>
-                                    <th>Item</th>
-                                    <th class="w-28">Qty</th>
-                                    <th class="w-36">Price</th>
-                                    <th class="w-36">Amount</th>
+                                    <th class="w-[12rem]">Item</th>
+                                    <th class="w-20">Qty</th>
+                                    <th class="w-20">Unit</th>
+                                    <th class="w-32">Price</th>
+                                    <th class="w-32">Amount</th>
                                     <th class="w-20"></th>
                                 </tr>
                             </thead>
                             <tbody id="sale-items-body"></tbody>
                         </table>
                     </div>
+                    <p class="text-xs text-base-content/60">Use horizontal scroll to access all item columns on smaller screens.</p>
                     <datalist id="sale-item-options">
                         <option value="Cement - PPC"></option>
                         <option value="Cement - OPC"></option>
@@ -158,7 +160,7 @@
             }
         }
 
-        function createRow(itemName = '', quantity = 1, price = '') {
+        function createRow(itemName = '', unit = '', quantity = 1, price = '') {
             const row = document.createElement('tr');
             row.innerHTML = `
                 <td>
@@ -166,6 +168,15 @@
                 </td>
                 <td>
                     <input type="number" min="1" step="1" inputmode="numeric" class="input input-bordered input-sm w-full text-right" data-item-quantity placeholder="1" value="1">
+                </td>
+                <td>
+                    <select class="select select-bordered select-sm w-full" data-item-unit>
+                        <option value="">Unit</option>
+                        <option value="Nissan">Nissan</option>
+                        <option value="Tipper">Tipper</option>
+                        <option value="Bora">Bora</option>
+                        <option value="Pieces">Pieces</option>
+                    </select>
                 </td>
                 <td>
                     <input type="number" min="0" step="0.01" class="input input-bordered input-sm w-full text-right" data-item-price placeholder="0.00">
@@ -179,9 +190,12 @@
             `;
             tbody.appendChild(row);
             row.querySelector('[data-item-name]').value = itemName || '';
+            const unitInput = row.querySelector('[data-item-unit]');
+            unitInput.value = ['', 'Nissan', 'Tipper', 'Bora', 'Pieces'].includes(unit) ? unit : '';
             row.querySelector('[data-item-quantity]').value = quantity === '' || quantity === null || quantity === undefined ? '1' : String(quantity);
             row.querySelector('[data-item-price]').value = price === '' || price === null || price === undefined ? '' : String(price);
             recalculateRow(row);
+            return row;
         }
 
         function recalculateRow(row) {
@@ -201,6 +215,7 @@
             const payload = rows
                 .map((row) => {
                     const name = row.querySelector('[data-item-name]').value.trim();
+                    const unitValue = (row.querySelector('[data-item-unit]').value || '').trim();
                     const quantityValue = Math.trunc(parseNumber(row.querySelector('[data-item-quantity]').value, 1));
                     const priceValue = parseNumber(row.querySelector('[data-item-price]').value, 0);
                     const safeQuantity = quantityValue > 0 ? quantityValue : 1;
@@ -208,6 +223,7 @@
                     const amountValue = Number((safeQuantity * safePrice).toFixed(2));
                     return {
                         item: name,
+                        unit: unitValue,
                         quantity: safeQuantity,
                         price: Number(safePrice.toFixed(2)),
                         amount: amountValue,
@@ -254,13 +270,17 @@
         });
 
         addBtn.addEventListener('click', () => {
-            createRow();
+            const newRow = createRow();
             syncItemsPayload();
+            const itemNameInput = newRow.querySelector('[data-item-name]');
+            if (itemNameInput) {
+                itemNameInput.focus();
+            }
         });
 
         const initialItems = parseInitialItems();
         if (initialItems.length) {
-            initialItems.forEach((item) => createRow(item.item || '', item.quantity ?? 1, item.price ?? ''));
+            initialItems.forEach((item) => createRow(item.item || '', item.unit || '', item.quantity ?? 1, item.price ?? ''));
         } else {
             createRow();
         }

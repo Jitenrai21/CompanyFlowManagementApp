@@ -21,6 +21,9 @@ from .models import (
 )
 
 
+SALE_ITEM_UNIT_OPTIONS = ("Nissan", "Tipper", "Bora", "Pieces")
+
+
 def _decorate_widget(field_name, field):
     existing_class = field.widget.attrs.get("class", "")
     if field_name in {"alert_enabled"}:
@@ -148,7 +151,7 @@ class SaleForm(forms.ModelForm):
         }
 
         help_texts = {
-            "items": "Add items with name and price using the item table.",
+            "items": "Add item, unit, quantity, and price using the item table.",
             "paid_amount": "Enter any amount received now. The remaining balance can be settled later.",
         }
 
@@ -196,6 +199,12 @@ class SaleForm(forms.ModelForm):
             if not item_name:
                 raise ValidationError(f"Item #{index} must include 'item'.")
 
+            unit = str(item.get("unit", "")).strip()
+            if unit and unit not in SALE_ITEM_UNIT_OPTIONS:
+                raise ValidationError(
+                    f"Item #{index} unit must be one of: {', '.join(SALE_ITEM_UNIT_OPTIONS)}."
+                )
+
             price = item.get("price")
             if price in (None, ""):
                 raise ValidationError(f"Item #{index} must include price.")
@@ -216,6 +225,7 @@ class SaleForm(forms.ModelForm):
             normalized_items.append(
                 {
                     "item": item_name,
+                    "unit": unit,
                     "quantity": float(quantity_number),
                     "price": float(price_number),
                     "amount": float(amount_number),
