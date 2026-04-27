@@ -182,6 +182,18 @@
         return formatNprNumber(numeric, { forceInteger: true });
     }
 
+    function formatSimpleBarTooltip(param) {
+        return `${param.name}<br/>Total: ${formatNpr(param.value)}`;
+    }
+
+    function formatSummaryBarLabel(value) {
+        const numeric = numberFrom(value);
+        if (numeric <= 0) {
+            return '';
+        }
+        return formatCompactAxisValue(numeric);
+    }
+
     const incomeExpenseBarStyleSpec = {
         animationDuration: 820,
         legend: {
@@ -447,6 +459,16 @@
         return { income, expense };
     }
 
+    function swapFirstTwoEntries(labels, values) {
+        const safeLabels = Array.isArray(labels) ? [...labels] : [];
+        const safeValues = Array.isArray(values) ? [...values] : [];
+        if (safeLabels.length > 1 && safeValues.length > 1) {
+            [safeLabels[0], safeLabels[1]] = [safeLabels[1], safeLabels[0]];
+            [safeValues[0], safeValues[1]] = [safeValues[1], safeValues[0]];
+        }
+        return { labels: safeLabels, values: safeValues };
+    }
+
     function splitJcbSeries(labels, values) {
         const income = [];
         const expense = [];
@@ -615,21 +637,42 @@
 
         if (pieCanvas && incomeExpenseLabels && incomeExpenseValues) {
             const { income, expense } = splitIncomeExpense(incomeExpenseLabels, incomeExpenseValues);
+            const incomeTotal = income.reduce((sum, value) => sum + numberFrom(value), 0);
+            const expenseTotal = expense.reduce((sum, value) => sum + numberFrom(value), 0);
+            const incomeExpenseCategoryLabels = ['Income', 'Expense'];
             const barChart = echarts.init(pieCanvas, null, { renderer: 'canvas' });
             barChart.setOption(buildSharedBarChartOption({
-                labels: incomeExpenseLabels,
+                labels: incomeExpenseCategoryLabels,
                 colors: [chartPalette.mint, chartPalette.coral],
+                animationDuration: 820,
+                legend: { show: false },
+                categoryAxis: {
+                    axisTick: { alignWithLabel: true }
+                },
+                categoryAxisLabel: {
+                    align: 'center',
+                    interval: 0
+                },
                 tooltip: {
-                    formatter(params) {
-                        const incomeValue = numberFrom(params.find((item) => item.seriesName === 'Income')?.value);
-                        const expenseValue = numberFrom(params.find((item) => item.seriesName === 'Expense')?.value);
-                        const net = incomeValue - expenseValue;
-                        return `${params[0].axisValue}<br/>Income: ${formatNpr(incomeValue)}<br/>Expense: ${formatNpr(expenseValue)}<br/>Net: ${formatNpr(net)}`;
+                    trigger: 'item',
+                    formatter(param) {
+                        return formatSimpleBarTooltip(param);
                     }
                 },
                 series: [
-                    { name: 'Income', data: income },
-                    { name: 'Expense', data: expense }
+                    {
+                        name: 'Income vs Expense',
+                        data: [incomeTotal, expenseTotal].map((value, index) => ({
+                            value,
+                            itemStyle: { color: index === 0 ? chartPalette.mint : chartPalette.coral }
+                        })),
+                        label: {
+                            show: true,
+                            position: 'top',
+                            color: '#31445F',
+                            formatter: ({ value }) => formatSummaryBarLabel(value)
+                        }
+                    }
                 ]
             }));
             registerChart('incomeExpense', barChart, pieCanvas);
@@ -789,36 +832,55 @@
 
         if (jcbSummaryCanvas && jcbSummaryLabels && jcbSummaryValues) {
             const jcbSeries = splitJcbSeries(jcbSummaryLabels, jcbSummaryValues);
+            const jcbIncomeTotal = jcbSeries.income.reduce((sum, value) => sum + numberFrom(value), 0);
+            const jcbExpenseTotal = jcbSeries.expense.reduce((sum, value) => sum + numberFrom(value), 0);
+            const jcbCategoryLabels = ['JCB Income', 'JCB Expense'];
 
             const jcbChart = echarts.init(jcbSummaryCanvas, null, { renderer: 'canvas' });
             jcbChart.setOption(buildSharedBarChartOption({
-                labels: jcbSummaryLabels,
+                labels: jcbCategoryLabels,
                 colors: [chartPalette.mint, chartPalette.coral],
-                animationDuration: 920,
-                grid: { left: 18, right: 26, top: 48, bottom: 22, containLabel: true },
-                valueAxis: { name: 'NPR' },
+                animationDuration: 820,
+                legend: { show: false },
+                grid: { left: 18, right: 18, top: 42, bottom: 22, containLabel: true },
+                categoryAxis: {
+                    axisTick: { alignWithLabel: true }
+                },
+                categoryAxisLabel: {
+                    align: 'center',
+                    interval: 0
+                },
                 tooltip: {
-                    formatter(params) {
-                        const lines = [params[0].axisValue];
-                        params.forEach((item) => {
-                            lines.push(`${item.marker}${item.seriesName}: ${formatNpr(item.value)}`);
-                        });
-                        return lines.join('<br/>');
+                    trigger: 'item',
+                    formatter(param) {
+                        return formatSimpleBarTooltip(param);
                     }
                 },
                 series: [
-                    { name: 'Income', barMaxWidth: 26, data: jcbSeries.income },
-                    { name: 'Expense', barMaxWidth: 26, data: jcbSeries.expense }
+                    {
+                        name: 'JCB Summary',
+                        data: [jcbIncomeTotal, jcbExpenseTotal].map((value, index) => ({
+                            value,
+                            itemStyle: { color: index === 0 ? chartPalette.mint : chartPalette.coral }
+                        })),
+                        label: {
+                            show: true,
+                            position: 'top',
+                            color: '#31445F',
+                            formatter: ({ value }) => formatSummaryBarLabel(value)
+                        }
+                    }
                 ]
             }));
             registerChart('jcbSummary', jcbChart, jcbSummaryCanvas);
         }
 
         if (tipperSummaryCanvas && tipperSummaryLabels && tipperSummaryValues) {
+            const tipperSwapped = swapFirstTwoEntries(tipperSummaryLabels, tipperSummaryValues);
             const tipperChart = echarts.init(tipperSummaryCanvas, null, { renderer: 'canvas' });
             tipperChart.setOption(buildSharedBarChartOption({
-                labels: tipperSummaryLabels,
-                colors: [chartPalette.coral, chartPalette.mint],
+                labels: tipperSwapped.labels,
+                colors: [chartPalette.mint, chartPalette.coral],
                 animationDuration: 820,
                 // Exception: single-series summary chart hides legend to avoid redundant UI noise.
                 legend: { show: false },
@@ -830,9 +892,9 @@
                     }
                 },
                 series: [{
-                    data: tipperSummaryValues.map((value, index) => ({
+                    data: tipperSwapped.values.map((value, index) => ({
                         value,
-                        itemStyle: { color: index === 0 ? chartPalette.coral : chartPalette.mint }
+                        itemStyle: { color: index === 0 ? chartPalette.mint : chartPalette.coral }
                     })),
                     label: {
                         show: true,
@@ -846,10 +908,11 @@
         }
 
         if (blocksSummaryCanvas && blocksSummaryLabels && blocksSummaryValues) {
+            const blocksSwapped = swapFirstTwoEntries(blocksSummaryLabels, blocksSummaryValues);
             const blocksChart = echarts.init(blocksSummaryCanvas, null, { renderer: 'canvas' });
             blocksChart.setOption(buildSharedBarChartOption({
-                labels: blocksSummaryLabels,
-                colors: [chartPalette.coral, chartPalette.mint],
+                labels: blocksSwapped.labels,
+                colors: [chartPalette.mint, chartPalette.coral],
                 animationDuration: 820,
                 // Exception: single-series summary chart hides legend to avoid redundant UI noise.
                 legend: { show: false },
@@ -861,9 +924,9 @@
                     }
                 },
                 series: [{
-                    data: blocksSummaryValues.map((value, index) => ({
+                    data: blocksSwapped.values.map((value, index) => ({
                         value,
-                        itemStyle: { color: index === 0 ? chartPalette.coral : chartPalette.mint }
+                        itemStyle: { color: index === 0 ? chartPalette.mint : chartPalette.coral }
                     })),
                     label: {
                         show: true,
@@ -877,10 +940,11 @@
         }
 
         if (cementSummaryCanvas && cementSummaryLabels && cementSummaryValues) {
+            const cementSwapped = swapFirstTwoEntries(cementSummaryLabels, cementSummaryValues);
             const cementChart = echarts.init(cementSummaryCanvas, null, { renderer: 'canvas' });
             cementChart.setOption(buildSharedBarChartOption({
-                labels: cementSummaryLabels,
-                colors: [chartPalette.coral, chartPalette.mint],
+                labels: cementSwapped.labels,
+                colors: [chartPalette.mint, chartPalette.coral],
                 animationDuration: 820,
                 // Exception: single-series summary chart hides legend to avoid redundant UI noise.
                 legend: { show: false },
@@ -892,9 +956,9 @@
                     }
                 },
                 series: [{
-                    data: cementSummaryValues.map((value, index) => ({
+                    data: cementSwapped.values.map((value, index) => ({
                         value,
-                        itemStyle: { color: index === 0 ? chartPalette.coral : chartPalette.mint }
+                        itemStyle: { color: index === 0 ? chartPalette.mint : chartPalette.coral }
                     })),
                     label: {
                         show: true,
@@ -908,10 +972,11 @@
         }
 
         if (bambooSummaryCanvas && bambooSummaryLabels && bambooSummaryValues) {
+            const bambooSwapped = swapFirstTwoEntries(bambooSummaryLabels, bambooSummaryValues);
             const bambooChart = echarts.init(bambooSummaryCanvas, null, { renderer: 'canvas' });
             bambooChart.setOption(buildSharedBarChartOption({
-                labels: bambooSummaryLabels,
-                colors: [chartPalette.coral, chartPalette.mint],
+                labels: bambooSwapped.labels,
+                colors: [chartPalette.mint, chartPalette.coral],
                 animationDuration: 820,
                 // Exception: single-series summary chart hides legend to avoid redundant UI noise.
                 legend: { show: false },
@@ -923,9 +988,9 @@
                     }
                 },
                 series: [{
-                    data: bambooSummaryValues.map((value, index) => ({
+                    data: bambooSwapped.values.map((value, index) => ({
                         value,
-                        itemStyle: { color: index === 0 ? chartPalette.coral : chartPalette.mint }
+                        itemStyle: { color: index === 0 ? chartPalette.mint : chartPalette.coral }
                     })),
                     label: {
                         show: true,

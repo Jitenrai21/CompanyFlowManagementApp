@@ -164,6 +164,13 @@
         }
     }
 
+    function getTodayDateValue() {
+        const today = new Date();
+        const month = String(today.getMonth() + 1).padStart(2, '0');
+        const day = String(today.getDate()).padStart(2, '0');
+        return `${today.getFullYear()}-${month}-${day}`;
+    }
+
     function togglePaymentStatusField() {
         if (!recordTypeInput || !paymentStatusField || !paymentStatusInput || !customerField || !customerInput || !paidAmountField || !paidAmountInput || !dueDateField || !dueDateInput || !alertEnabledField || !alertEnabledInput) {
             return;
@@ -186,6 +193,8 @@
             if (isPaid) {
                 dueDateInput.value = '';
                 alertEnabledInput.checked = false;
+            } else if (!dueDateInput.value) {
+                dueDateInput.value = getTodayDateValue();
             }
         }
         if (!isSale) {
