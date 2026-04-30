@@ -33,6 +33,7 @@ from .calendar_mode import (
 	normalize_calendar_mode,
 )
 from .bs_date_utils import ad_string_to_date, date_to_calendar_input, parse_calendar_date_input, resolve_ad_date_filters
+from .cash_entry_display import build_customer_payment_display
 from .models import (
 	AlertNotification,
 	AlertSource,
@@ -1647,6 +1648,10 @@ def _customer_payment_context(customer, request):
 		)
 
 	pending_payment_rows.sort(key=lambda row: (row["date"], row["source"], row["reference"]))
+	customer_payment_history = [
+		build_customer_payment_display(customer_payment)
+		for customer_payment in customer.customer_payments.prefetch_related("allocations__sale").order_by("-payment_date", "-created_at")
+	]
 
 	transaction_totals = customer.transactions.filter(type=TransactionType.INCOME).exclude(
 		category__name=CREDIT_BALANCE_APPLIED_CATEGORY,
@@ -1664,6 +1669,7 @@ def _customer_payment_context(customer, request):
 		"pending_material_total": pending_material_total,
 		"pending_item_count": pending_item_count,
 		"pending_payment_rows": pending_payment_rows,
+		"customer_payment_history": customer_payment_history,
 		"total_payment": transaction_totals["total_income"],
 		"due_amount": due_amount,
 		"manual_due_amount": customer.manual_due_amount,
@@ -1721,9 +1727,6 @@ def export_report(request):
 @login_required
 def cash_entries(request):
 	default_from, default_to = _get_default_date_range()
-	transactions = Transaction.objects.select_related("customer", "sale", "bamboo_record", "cement_record", "jcb_record", "tipper_record", "category").exclude(
-		category__name=CREDIT_BALANCE_APPLIED_CATEGORY,
-	)
 
 	query = request.GET.get("q", "").strip()
 	date_filters = _resolve_request_date_filters(
@@ -1737,6 +1740,25 @@ def cash_entries(request):
 	payment_method = request.GET.get("payment_method", "").strip()
 	category_id = request.GET.get("category", "").strip()
 	sort = request.GET.get("sort", "-date")
+	selected_category_name = None
+	if category_id:
+		selected_category_name = TransactionCategory.objects.filter(pk=category_id).values_list("name", flat=True).first()
+
+	transactions = Transaction.objects.select_related(
+		"customer",
+		"sale",
+		"bamboo_record",
+		"cement_record",
+		"jcb_record",
+		"tipper_record",
+		"category",
+	).exclude(
+		category__name__in=[
+			CREDIT_BALANCE_APPLIED_CATEGORY,
+			PAYMENT_ALLOCATION_CATEGORY,
+			CREDIT_TOPUP_CATEGORY,
+		]
+	)
 
 	if query:
 		transactions = transactions.filter(
@@ -1755,17 +1777,50 @@ def cash_entries(request):
 	if category_id:
 		transactions = transactions.filter(category_id=category_id)
 
-	allowed_sorts = {
-		"-date": "-date",
-		"date": "date",
-		"-amount": "-amount",
-		"amount": "amount",
-		"customer": "customer__name",
-		"-customer": "-customer__name",
-	}
-	transactions = transactions.order_by(allowed_sorts.get(sort, "-date"), "-created_at")
+	customer_payments = CustomerPayment.objects.select_related("customer").prefetch_related("allocations__sale")
+	if query:
+		customer_payments = customer_payments.filter(
+			Q(customer__name__icontains=query)
+			| Q(notes__icontains=query)
+			| Q(allocations__sale__invoice_number__icontains=query)
+		)
+	if date_from:
+		customer_payments = customer_payments.filter(payment_date__gte=date_from)
+	if date_to:
+		customer_payments = customer_payments.filter(payment_date__lte=date_to)
+	if payment_method:
+		customer_payments = customer_payments.filter(payment_method=payment_method)
+	if category_id and selected_category_name != PAYMENT_ALLOCATION_CATEGORY:
+		customer_payments = customer_payments.none()
+	if transaction_type and transaction_type != TransactionType.INCOME:
+		customer_payments = customer_payments.none()
 
-	paginator = Paginator(transactions, 20)
+	transaction_rows = list(transactions)
+	grouped_rows = [build_customer_payment_display(customer_payment) for customer_payment in customer_payments.distinct()]
+	combined_rows = transaction_rows + grouped_rows
+
+	def _sort_value(entry):
+		entry_date = getattr(entry, "date", None) or getattr(entry, "payment_date", None)
+		entry_amount = getattr(entry, "amount", Decimal("0.00"))
+		entry_customer = getattr(getattr(entry, "customer", None), "name", "")
+		entry_created = getattr(entry, "created_at", None) or getattr(entry, "updated_at", None) or timezone.now()
+
+		if sort == "amount":
+			return (entry_amount, entry_date or timezone.localdate(), entry_created)
+		if sort == "-amount":
+			return (entry_amount, entry_date or timezone.localdate(), entry_created)
+		if sort == "customer":
+			return (entry_customer.lower(), entry_date or timezone.localdate(), entry_created)
+		if sort == "-customer":
+			return (entry_customer.lower(), entry_date or timezone.localdate(), entry_created)
+		return (entry_date or timezone.localdate(), entry_created)
+
+	if sort in {"-date", "-amount", "-customer"}:
+		combined_rows = sorted(combined_rows, key=_sort_value, reverse=True)
+	else:
+		combined_rows = sorted(combined_rows, key=_sort_value)
+
+	paginator = Paginator(combined_rows, 20)
 	page_obj = paginator.get_page(request.GET.get("page"))
 
 	context = {

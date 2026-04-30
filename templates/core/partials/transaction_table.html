@@ -20,6 +20,38 @@
             </thead>
             <tbody>
                 {% for transaction in transactions %}
+                {% if transaction.is_grouped_payment %}
+                <tr>
+                    <td>{{ transaction.date|calendar_date:request }}</td>
+                    <td>{% if transaction.customer %}<a href="{% url 'customer_detail' transaction.customer.id %}">{{ transaction.customer.name }}</a>{% else %}<span class="text-base-content/50">Unassigned</span>{% endif %}</td>
+                    <td>
+                        <span class="badge badge-sm whitespace-nowrap gap-1 badge-success badge-outline">{{ transaction.get_type_display }}</span>
+                    </td>
+                    <td>{{ transaction.get_payment_method_display }}</td>
+                    <td>Customer Payment</td>
+                    <td>NPR {{ transaction.amount|npr_amount }}</td>
+                    <td>
+                        {{ transaction.description }}
+                    </td>
+                    <td class="text-right align-middle">
+                        <div class="inline-flex min-h-8 items-center justify-end gap-1 whitespace-nowrap">
+                            <div class="hidden md:flex items-center justify-end gap-1">
+                                <a href="{% url 'customer_detail' transaction.customer.id %}" class="btn btn-xs btn-square btn-outline" title="View customer" aria-label="View customer {{ transaction.customer.id }}">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-3.5 w-3.5" aria-hidden="true"><path d="M10 3c-4.5 0-8.25 2.5-9.5 6.5C1.75 13.5 5.5 16 10 16s8.25-2.5 9.5-6.5C18.25 5.5 14.5 3 10 3zm0 10a3.5 3.5 0 110-7 3.5 3.5 0 010 7z" /></svg>
+                                </a>
+                            </div>
+                            <div class="dropdown dropdown-end md:hidden">
+                                <label tabindex="0" class="btn btn-xs btn-outline">Actions</label>
+                                <div tabindex="0" class="dropdown-content z-[1] mt-2 w-44 rounded-box border border-base-300 bg-base-100 p-2 shadow">
+                                    <div class="flex flex-col gap-1">
+                                        <a href="{% url 'customer_detail' transaction.customer.id %}" class="btn btn-xs btn-ghost justify-start">View customer</a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+                {% else %}
                 <tr>
                     <td>{{ transaction.date|calendar_date:request }}</td>
                     <td>{% if transaction.customer %}{{ transaction.customer.name }}{% else %}<span class="text-base-content/50">Unassigned</span>{% endif %}</td>
@@ -87,6 +119,7 @@
                         </div>
                     </td>
                 </tr>
+                {% endif %}
                 {% empty %}
                 <tr>
                     <td colspan="8" class="py-0">

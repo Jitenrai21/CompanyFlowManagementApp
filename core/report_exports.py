@@ -21,6 +21,7 @@ from reportlab.lib.units import mm
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 from .bs_date_utils import resolve_ad_date_filters
+from .cash_entry_display import build_customer_payment_display
 from .models import (
     AlertNotification,
     AlertSource,
@@ -34,11 +35,13 @@ from .models import (
     CementRecordType,
     CementUnitType,
     Customer,
+    CustomerPayment,
     JCBRecord,
     RecordStatus,
     Sale,
     TipperRecord,
     TipperRecordType,
+    TransactionCategory,
     Transaction,
     TransactionType,
 )
@@ -48,6 +51,7 @@ logger = logging.getLogger(__name__)
 AUTO_SALE_INCOME_CATEGORY = "Sale Income (Auto)"
 CREDIT_BALANCE_APPLIED_CATEGORY = "Credit Balance Applied"
 PAYMENT_ALLOCATION_CATEGORY = "Sales Payment Allocation"
+CREDIT_TOPUP_CATEGORY = "Customer Credit Top-up"
 
 
 @dataclass
@@ -721,6 +725,39 @@ def _build_material_definition(params, model, title, filename_slug, has_unit_typ
 
 def _build_cash_entries_definition(params):
     queryset, filters = _filtered_transactions(params)
+    query = filters["q"]
+    transaction_type = filters["type"]
+    category_id = filters["category"]
+    selected_category_name = None
+    if category_id:
+        selected_category_name = TransactionCategory.objects.filter(pk=category_id).values_list("name", flat=True).first()
+    transactions = queryset.exclude(
+        category__name__in=[
+            PAYMENT_ALLOCATION_CATEGORY,
+            CREDIT_TOPUP_CATEGORY,
+        ]
+    )
+    customer_payments = CustomerPayment.objects.select_related("customer").prefetch_related("allocations__sale")
+    if query:
+        customer_payments = customer_payments.filter(
+            Q(customer__name__icontains=query)
+            | Q(notes__icontains=query)
+            | Q(allocations__sale__invoice_number__icontains=query)
+        )
+    if filters["date_from"]:
+        customer_payments = customer_payments.filter(payment_date__gte=filters["date_from"])
+    if filters["date_to"]:
+        customer_payments = customer_payments.filter(payment_date__lte=filters["date_to"])
+    if filters["customer"]:
+        customer_payments = customer_payments.filter(customer_id=filters["customer"])
+    if transaction_type and transaction_type != TransactionType.INCOME:
+        customer_payments = customer_payments.none()
+    if category_id and selected_category_name != PAYMENT_ALLOCATION_CATEGORY:
+        customer_payments = customer_payments.none()
+    if filters["sort"] in {"customer", "-customer"}:
+        customer_payments = customer_payments.order_by("customer__name", "-created_at")
+    else:
+        customer_payments = customer_payments.order_by("-payment_date", "-created_at")
     headers = [
         "Date",
         "Type",
@@ -728,13 +765,52 @@ def _build_cash_entries_definition(params):
         "Payment Method",
         "Customer",
         "Category",
-        "Linked Sale",
-        "Linked Modules",
+        "Summary",
+        "Allocated To Sales",
+        "Unallocated To Credit",
+        "Linked Sale Count",
         "Description",
     ]
 
+    def _sort_key(entry):
+        entry_date = getattr(entry, "date", None) or getattr(entry, "payment_date", None)
+        entry_amount = getattr(entry, "amount", Decimal("0.00"))
+        entry_customer = getattr(getattr(entry, "customer", None), "name", "")
+        entry_created = getattr(entry, "created_at", None) or timezone.now()
+        if filters["sort"] == "amount":
+            return (entry_amount, entry_date or timezone.localdate(), entry_created)
+        if filters["sort"] == "-amount":
+            return (entry_amount, entry_date or timezone.localdate(), entry_created)
+        if filters["sort"] == "customer":
+            return (entry_customer.lower(), entry_date or timezone.localdate(), entry_created)
+        if filters["sort"] == "-customer":
+            return (entry_customer.lower(), entry_date or timezone.localdate(), entry_created)
+        return (entry_date or timezone.localdate(), entry_created)
+
+    combined_rows = list(transactions) + [build_customer_payment_display(payment) for payment in customer_payments.distinct()]
+    if filters["sort"] in {"-date", "-amount", "-customer"}:
+        combined_rows = sorted(combined_rows, key=_sort_key, reverse=True)
+    else:
+        combined_rows = sorted(combined_rows, key=_sort_key)
+
     def row_factory():
-        for transaction in queryset:
+        for transaction in combined_rows:
+            if getattr(transaction, "is_grouped_payment", False):
+                yield [
+                    transaction.date,
+                    transaction.get_type_display(),
+                    transaction.amount,
+                    transaction.get_payment_method_display(),
+                    transaction.customer.name if transaction.customer else "",
+                    transaction.category,
+                    transaction.summary_text,
+                    transaction.allocated_total,
+                    transaction.unallocated_total,
+                    transaction.allocation_count,
+                    transaction.description,
+                ]
+                continue
+
             linked_modules = []
             if transaction.sale_id:
                 linked_modules.append("Sale")
@@ -755,8 +831,10 @@ def _build_cash_entries_definition(params):
                 transaction.get_payment_method_display(),
                 transaction.customer.name if transaction.customer else "",
                 transaction.category.name if transaction.category else "",
-                transaction.sale.invoice_number if transaction.sale_id else "",
-                ", ".join(linked_modules),
+                "",
+                "",
+                "",
+                "",
                 transaction.description,
             ]
 

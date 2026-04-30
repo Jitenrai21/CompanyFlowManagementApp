@@ -122,6 +122,46 @@
                     <button type="submit" name="allocation_mode" value="cash" class="btn btn-primary" {% if not pending_sales_rows and not pending_material_rows and manual_due_amount <= 0 %}disabled{% endif %}>Allocate Payment</button>
                 </div>
             </form>
+                {% if customer_payment_history %}
+                <div class="cf-table-shell">
+                    <div class="cf-table-head">
+                        <h2 class="font-semibold">Recent Customer Payments</h2>
+                        <span class="text-xs text-base-content/60">Breakdown used by cash entries</span>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="table table-zebra table-md">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Total</th>
+                                    <th>Allocated</th>
+                                    <th>Unallocated</th>
+                                    <th>Summary</th>
+                                    <th>Breakdown</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for payment in customer_payment_history %}
+                                <tr>
+                                    <td>{{ payment.date|calendar_date:request }}</td>
+                                    <td>NPR {{ payment.amount|npr_amount }}</td>
+                                    <td>NPR {{ payment.allocated_total|npr_amount }}</td>
+                                    <td>NPR {{ payment.unallocated_total|npr_amount }}</td>
+                                    <td>{{ payment.summary_text }}</td>
+                                    <td>
+                                        {% if payment.allocation_lines %}
+                                            {{ payment.allocation_lines|join:", " }}
+                                        {% else %}
+                                            <span class="text-base-content/50">-</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                {% endif %}
         </div>
     </div>
 </div>
