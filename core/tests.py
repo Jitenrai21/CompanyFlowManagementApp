@@ -100,6 +100,12 @@ class SalesWorkflowTests(TestCase):
 		response_paid = self.client.get(reverse("sales"), {"status": "paid"})
 		self.assertContains(response_paid, "INV-1001")
 
+	def test_sales_table_links_customer_profile(self):
+		self.client.login(username="tester", password="pass1234")
+		response = self.client.get(reverse("sales"))
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, reverse("customer_detail", args=[self.customer.pk]))
+
 	def test_sale_form_validates_itemized_json(self):
 		invalid_form = SaleForm(
 			data={
@@ -1647,5 +1653,62 @@ class ModuleCustomerAllocationTests(TestCase):
 		self.assertEqual(response.status_code, 302)
 		expense_tx.refresh_from_db()
 		self.assertIsNone(expense_tx.bamboo_record)
+
+
+class SupplementaryRecordDetailTests(TestCase):
+	def setUp(self):
+		user_model = get_user_model()
+		self.user = user_model.objects.create_user(username="profile-user", password="pass1234")
+		self.customer = Customer.objects.create(name="Profile Customer")
+		self.bamboo_record = BambooRecord.objects.create(
+			date=bs_today_date(),
+			record_type=BambooRecordType.SALE,
+			customer=self.customer,
+			quantity=5,
+			price_per_unit=Decimal("80.00"),
+			paid_amount=Decimal("100.00"),
+		)
+		self.cement_record = CementRecord.objects.create(
+			date=bs_today_date(),
+			record_type=CementRecordType.SALE,
+			customer=self.customer,
+			unit_type=CementUnitType.PPC,
+			quantity=10,
+			price_per_unit=Decimal("60.00"),
+			paid_amount=Decimal("0.00"),
+		)
+		self.blocks_record = BlocksRecord.objects.create(
+			date=bs_today_date(),
+			record_type=BlocksRecordType.SALE,
+			customer=self.customer,
+			unit_type=BlocksUnitType.SIX_INCH,
+			quantity=12,
+			price_per_unit=Decimal("95.00"),
+			paid_amount=Decimal("50.00"),
+		)
+		self.bamboo_tx = Transaction.objects.create(
+			date=bs_today_date(),
+			amount=Decimal("100.00"),
+			type=TransactionType.INCOME,
+			customer=self.customer,
+			bamboo_record=self.bamboo_record,
+		)
+
+	def test_supplementary_detail_pages_require_login(self):
+		for route_name, record in (
+			("bamboo_record_detail", self.bamboo_record),
+			("cement_record_detail", self.cement_record),
+			("blocks_record_detail", self.blocks_record),
+		):
+			response = self.client.get(reverse(route_name, args=[record.pk]))
+			self.assertEqual(response.status_code, 302)
+
+	def test_bamboo_detail_page_links_customer_and_transactions(self):
+		self.client.login(username="profile-user", password="pass1234")
+		response = self.client.get(reverse("bamboo_record_detail", args=[self.bamboo_record.pk]))
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, reverse("customer_detail", args=[self.customer.pk]))
+		self.assertContains(response, reverse("transaction_detail", args=[self.bamboo_tx.pk]))
+		self.assertContains(response, "Mark as Paid")
 
 

@@ -37,7 +37,6 @@
                     <input type="hidden" name="redirect_to" value="{% url 'sales' %}">
                     <button type="submit" class="btn btn-error btn-outline">Delete Sale</button>
                 </form>
-                <a href="{% url 'sales' %}" class="btn btn-ghost">Back to Sales</a>
             </div>
         </div>
     </div>
@@ -47,7 +46,7 @@
             <div class="card-body space-y-4">
                 <h2 class="card-title text-xl">Sale Information</h2>
                 <div class="grid gap-3 md:grid-cols-2 text-sm">
-                    <p><span class="font-semibold">Customer:</span> {% if sale.customer %}{{ sale.customer.name }}{% else %}Unassigned{% endif %}</p>
+                    <p><span class="font-semibold">Customer:</span> {% if sale.customer %}<a href="{% url 'customer_detail' sale.customer.id %}" class="link link-primary">{{ sale.customer.name }}</a>{% else %}Unassigned{% endif %}</p>
                     <p><span class="font-semibold">Status:</span> {{ sale.get_status_display }}</p>
                     <p><span class="font-semibold">Alert Tracking:</span> {% if sale.alert_enabled %}On{% else %}Off{% endif %}</p>
                     <p><span class="font-semibold">Date:</span> {{ sale.date|calendar_date:request }}</p>

@@ -28,7 +28,7 @@
                         <a href="{% url 'sale_detail' sale.id %}" class="link link-primary">{{ sale.invoice_number }}</a>
                     </td>
                     <td>{{ sale.date|calendar_date:request }}</td>
-                    <td>{% if sale.customer %}{{ sale.customer.name }}{% else %}<span class="text-base-content/60">Unassigned</span>{% endif %}</td>
+                    <td>{% if sale.customer %}<a href="{% url 'customer_detail' sale.customer.id %}" class="link link-primary">{{ sale.customer.name }}</a>{% else %}<span class="text-base-content/60">Unassigned</span>{% endif %}</td>
                     <td>
                         {% if sale.items %}
                             <div class="space-y-1 text-xs leading-tight">

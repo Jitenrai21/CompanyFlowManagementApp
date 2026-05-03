@@ -385,7 +385,7 @@ def _build_alert_items(alert_type="", customer_id="", date_from="", date_to=""):
 		_material_alert_queryset(BlocksRecord, BlocksRecordType.SALE),
 		AlertSource.BLOCKS_SALE,
 		"Blocks",
-		"blocks_record_edit",
+		"blocks_record_detail",
 		alert_type,
 		today,
 		upcoming_end,
@@ -398,7 +398,7 @@ def _build_alert_items(alert_type="", customer_id="", date_from="", date_to=""):
 		_material_alert_queryset(CementRecord, CementRecordType.SALE),
 		AlertSource.CEMENT_SALE,
 		"Cement",
-		"cement_record_edit",
+		"cement_record_detail",
 		alert_type,
 		today,
 		upcoming_end,
@@ -411,7 +411,7 @@ def _build_alert_items(alert_type="", customer_id="", date_from="", date_to=""):
 		_material_alert_queryset(BambooRecord, BambooRecordType.SALE),
 		AlertSource.BAMBOO_SALE,
 		"Bamboo",
-		"bamboo_record_edit",
+		"bamboo_record_detail",
 		alert_type,
 		today,
 		upcoming_end,
@@ -1632,6 +1632,12 @@ def _customer_payment_context(customer, request):
 
 	for row in pending_material_rows:
 		record = row["record"]
+		if row["module"] == "blocks":
+			detail_url = reverse("blocks_record_detail", args=[record.id])
+		elif row["module"] == "cement":
+			detail_url = reverse("cement_record_detail", args=[record.id])
+		else:
+			detail_url = reverse("bamboo_record_detail", args=[record.id])
 		pending_payment_rows.append(
 			{
 				"source": row["label"],
@@ -1644,6 +1650,7 @@ def _customer_payment_context(customer, request):
 				"due": row["pending_amount"],
 				"status": record.get_payment_status_display(),
 				"sale_id": None,
+				"detail_url": detail_url,
 			}
 		)
 
@@ -1676,6 +1683,23 @@ def _customer_payment_context(customer, request):
 		"payment_method_choices": PaymentMethod.choices,
 		"today": timezone.localdate(),
 		"payment_date_value": date_to_calendar_input(timezone.localdate(), get_calendar_mode(request)),
+	}
+
+
+def _material_record_detail_context(record, module_label, records_url_name):
+	transactions = record.transactions.select_related("customer", "category").order_by("-date", "-created_at")
+	module_key = module_label.lower()
+	return {
+		"record": record,
+		"module_label": module_label,
+		"page_title": f"{module_label} Record #{record.id}",
+		"page_subtitle": f"Customer-linked {module_label.lower()} sale profile with transaction history and status controls.",
+		"records_url_name": records_url_name,
+		"transactions": transactions,
+		"edit_url_name": f"{module_key}_record_edit",
+		"delete_url_name": f"{module_key}_record_delete",
+		"toggle_alert_url_name": f"{module_key}_record_toggle_alert",
+		"mark_paid_url_name": f"{module_key}_record_mark_paid",
 	}
 
 
@@ -2480,6 +2504,36 @@ def sale_detail(request, pk):
 	sale = get_object_or_404(Sale.objects.select_related("customer"), pk=pk)
 	context = _sale_receipt_context(sale, request)
 	return render(request, "core/sale_detail.html", context)
+
+
+@login_required
+def blocks_record_detail(request, pk):
+	record = get_object_or_404(BlocksRecord.objects.select_related("customer"), pk=pk)
+	return render(
+		request,
+		"core/material_record_detail.html",
+		_material_record_detail_context(record, "Blocks", "blocks_records"),
+	)
+
+
+@login_required
+def cement_record_detail(request, pk):
+	record = get_object_or_404(CementRecord.objects.select_related("customer"), pk=pk)
+	return render(
+		request,
+		"core/material_record_detail.html",
+		_material_record_detail_context(record, "Cement", "cement_records"),
+	)
+
+
+@login_required
+def bamboo_record_detail(request, pk):
+	record = get_object_or_404(BambooRecord.objects.select_related("customer"), pk=pk)
+	return render(
+		request,
+		"core/material_record_detail.html",
+		_material_record_detail_context(record, "Bamboo", "bamboo_records"),
+	)
 
 
 @login_required

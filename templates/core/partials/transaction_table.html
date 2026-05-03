@@ -54,7 +54,7 @@
                 {% else %}
                 <tr>
                     <td>{{ transaction.date|calendar_date:request }}</td>
-                    <td>{% if transaction.customer %}{{ transaction.customer.name }}{% else %}<span class="text-base-content/50">Unassigned</span>{% endif %}</td>
+                    <td>{% if transaction.customer %}<a href="{% url 'customer_detail' transaction.customer.id %}" class="link link-primary">{{ transaction.customer.name }}</a>{% else %}<span class="text-base-content/50">Unassigned</span>{% endif %}</td>
                     <td>
                         <span class="badge badge-sm whitespace-nowrap gap-1 {% if transaction.type == 'income' %}badge-success badge-outline{% else %}badge-error badge-outline{% endif %}">
                             {% if transaction.type == 'income' %}

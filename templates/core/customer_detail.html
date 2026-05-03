@@ -122,6 +122,8 @@
                         <td>
                             {% if row.sale_id %}
                             <a href="{% url 'sale_detail' row.sale_id %}" class="link link-primary">{{ row.reference }}</a>
+                            {% elif row.detail_url %}
+                            <a href="{{ row.detail_url }}" class="link link-primary">{{ row.reference }}</a>
                             {% else %}
                             {{ row.reference }}
                             {% endif %}

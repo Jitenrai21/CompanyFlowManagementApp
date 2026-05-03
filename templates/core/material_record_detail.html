@@ -1,0 +1,144 @@
+{% extends 'base.html' %}
+{% load core_format %}
+
+{% block title %}{{ page_title }} | Purba Paschim Construction and Suppliers Company Flow{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="cf-page-header">
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+                <h1 class="text-3xl font-extrabold tracking-tight">{{ module_label }} Record #{{ record.id }}</h1>
+                <p class="cf-page-subtitle">{{ page_subtitle }}</p>
+            </div>
+            <div class="flex gap-2">
+                {% if record.record_type == 'sale' %}
+                <form method="post" action="{% url toggle_alert_url_name record.id %}" class="inline">
+                    {% csrf_token %}
+                    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                    <button type="submit" class="btn {% if record.alert_enabled %}btn-warning{% else %}btn-info{% endif %} btn-outline">
+                        Alert {% if record.alert_enabled %}Off{% else %}On{% endif %}
+                    </button>
+                </form>
+                <form method="post" action="{% url mark_paid_url_name record.id %}" class="inline" onsubmit="return confirm('Mark {{ module_label|lower }} record #{{ record.id }} as paid?');">
+                    {% csrf_token %}
+                    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                    <button type="submit" class="btn btn-success btn-outline">Mark as Paid</button>
+                </form>
+                {% endif %}
+                <a href="{% url edit_url_name record.id %}" class="btn btn-outline">Edit Record</a>
+                <form method="post"
+                      action="{% url delete_url_name record.id %}"
+                      hx-post="{% url delete_url_name record.id %}"
+                      hx-swap="none"
+                      onsubmit="return confirm('Delete this {{ module_label|lower }} record? This cannot be undone.');"
+                      class="inline">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-error btn-outline">Delete Record</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="grid gap-4 lg:grid-cols-3">
+        <div class="cf-section lg:col-span-2">
+            <div class="card-body space-y-5">
+
+                <h2 class="card-title text-xl">{{ module_label }} Record Information</h2>
+                <div class="grid gap-3 text-sm md:grid-cols-2">
+                    <p><span class="font-semibold">Date:</span> {{ record.date|calendar_date:request }}</p>
+                    <p><span class="font-semibold">Customer:</span> {% if record.customer %}<a href="{% url 'customer_detail' record.customer.id %}" class="link link-primary">{{ record.customer.name }}</a>{% else %}<span class="text-base-content/60">Unassigned</span>{% endif %}</p>
+                    <p><span class="font-semibold">Type:</span> {{ record.get_record_type_display }}</p>
+                    <p><span class="font-semibold">Payment Status:</span> {% if record.record_type == 'sale' %}<span class="{% if record.payment_status == 'paid' %}text-success{% else %}text-warning{% endif %}">{{ record.get_payment_status_display }}</span>{% else %}<span class="text-base-content/60">N/A</span>{% endif %}</p>
+                    {% if record.unit_type %}<p><span class="font-semibold">Unit Type:</span> {{ record.get_unit_type_display }}</p>{% endif %}
+                    {% if record.quantity %}<p><span class="font-semibold">Quantity:</span> {{ record.quantity }}</p>{% endif %}
+                    <p><span class="font-semibold">Investment:</span> {% if record.investment %}NPR {{ record.investment|npr_amount }}{% else %}<span class="text-base-content/60">-</span>{% endif %}</p>
+                    <p><span class="font-semibold">Sale Income:</span> {% if record.sale_income %}NPR {{ record.sale_income|npr_amount }}{% else %}<span class="text-base-content/60">-</span>{% endif %}</p>
+                    <p><span class="font-semibold">Paid:</span> {% if record.record_type == 'sale' %}NPR {{ record.paid_amount|npr_amount }}{% else %}<span class="text-base-content/60">-</span>{% endif %}</p>
+                    <p><span class="font-semibold">Pending:</span> {% if record.record_type == 'sale' %}<span class="{% if record.pending_amount > 0 %}text-error{% else %}text-success{% endif %}">NPR {{ record.pending_amount|npr_amount }}</span>{% else %}<span class="text-base-content/60">-</span>{% endif %}</p>
+                    <p><span class="font-semibold">Alert Tracking:</span> {% if record.record_type == 'sale' %}{% if record.alert_enabled %}On{% else %}Off{% endif %}{% else %}<span class="text-base-content/60">N/A</span>{% endif %}</p>
+                    <p><span class="font-semibold">Due Date:</span> {% if record.due_date %}{{ record.due_date|calendar_date:request }}{% else %}<span class="text-base-content/60">-</span>{% endif %}</p>
+                    <p class="md:col-span-2"><span class="font-semibold">Notes:</span> {{ record.notes|default:'-' }}</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid gap-4">
+            <div class="cf-section">
+                <div class="card-body">
+                    <p class="text-sm text-base-content/60">Created</p>
+                    <p class="text-lg font-semibold">{{ record.created_at|calendar_datetime:request }}</p>
+                </div>
+            </div>
+            <div class="cf-section">
+                <div class="card-body">
+                    <p class="text-sm text-base-content/60">Last Updated</p>
+                    <p class="text-lg font-semibold">{{ record.updated_at|calendar_datetime:request }}</p>
+                </div>
+            </div>
+            {% if record.record_type == 'sale' %}
+            <div class="cf-section">
+                <div class="card-body">
+                    <p class="text-sm text-base-content/60">Sale Status</p>
+                    <p>
+                        <span class="badge badge-lg {% if record.payment_status == 'paid' %}badge-success{% else %}badge-warning{% endif %}">
+                            {{ record.get_payment_status_display }}
+                        </span>
+                    </p>
+                </div>
+            </div>
+
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="cf-table-shell">
+        <div class="cf-table-head">
+            <h2 class="font-semibold">Linked Transactions</h2>
+            <span class="text-xs text-base-content/60">{{ transactions|length }} transaction{{ transactions|length|pluralize }}</span>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="table table-zebra table-md">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Type</th>
+                        <th>Payment Method</th>
+                        <th>Category</th>
+                        <th>Amount</th>
+                        <th>Description</th>
+                        <th class="text-right whitespace-nowrap">Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for transaction in transactions %}
+                    <tr>
+                        <td><a href="{% url 'transaction_detail' transaction.id %}" class="link link-primary">{{ transaction.date|calendar_date:request }}</a></td>
+                        <td>
+                            <span class="badge badge-sm {% if transaction.type == 'income' %}badge-success{% else %}badge-error{% endif %} badge-outline">
+                                {{ transaction.get_type_display }}
+                            </span>
+                        </td>
+                        <td>{{ transaction.get_payment_method_display }}</td>
+                        <td>{{ transaction.category }}</td>
+                        <td>NPR {{ transaction.amount|npr_amount }}</td>
+                        <td>{{ transaction.description|default:'-' }}</td>
+                        <td class="text-right">
+                            <a href="{% url 'transaction_detail' transaction.id %}" class="btn btn-xs btn-outline">Open</a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="7" class="py-0">
+                            <div class="cf-empty">
+                                <p>No linked transactions yet.</p>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

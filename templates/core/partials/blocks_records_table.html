@@ -26,7 +26,7 @@
             <tbody>
                 {% for record in blocks_records %}
                 <tr>
-                    <td>{{ record.date|calendar_date:request }}</td>
+                    <td><a href="{% url 'blocks_record_detail' record.id %}" class="link link-primary">{{ record.date|calendar_date:request }}</a></td>
                     <td>
                         {% if record.record_type == 'sale' %}
                             <div class="badge badge-sm badge-success badge-outline gap-1 whitespace-nowrap">
@@ -110,6 +110,9 @@
                     <td class="text-right align-middle">
                         <div class="inline-flex min-h-8 items-center justify-end gap-1 whitespace-nowrap">
                             <div class="hidden md:flex items-center justify-end gap-1">
+                                <a href="{% url 'blocks_record_detail' record.id %}" class="btn btn-xs btn-square btn-outline" title="View record" aria-label="View blocks record {{ record.id }}">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-3.5 w-3.5" aria-hidden="true"><path d="M10 3c-4.5 0-8.25 2.5-9.5 6.5C1.75 13.5 5.5 16 10 16s8.25-2.5 9.5-6.5C18.25 5.5 14.5 3 10 3zm0 10a3.5 3.5 0 110-7 3.5 3.5 0 010 7z" /></svg>
+                                </a>
                                 <a href="{% url 'blocks_record_edit' record.id %}" class="btn btn-xs btn-square btn-outline" title="Edit record" aria-label="Edit blocks record {{ record.id }}">
                                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-3.5 w-3.5" aria-hidden="true"><path d="M13.586 2.586a2 2 0 112.828 2.828l-8.9 8.9a1 1 0 01-.424.26l-3 1a1 1 0 01-1.264-1.264l1-3a1 1 0 01.26-.424l8.9-8.9z" /></svg>
                                 </a>
@@ -147,6 +150,7 @@
                                 <label tabindex="0" class="btn btn-xs btn-outline">Actions</label>
                                 <div tabindex="0" class="dropdown-content z-[1] mt-2 w-44 rounded-box border border-base-300 bg-base-100 p-2 shadow">
                                     <div class="flex flex-col gap-1">
+                                        <a href="{% url 'blocks_record_detail' record.id %}" class="btn btn-xs btn-ghost justify-start">View</a>
                                         <a href="{% url 'blocks_record_edit' record.id %}" class="btn btn-xs btn-ghost justify-start">Edit</a>
                                         {% if record.record_type == 'sale' and record.payment_status == 'pending' %}
                                         <form method="post" action="{% url 'blocks_record_mark_paid' record.id %}" onsubmit="return confirm('Mark this blocks record as paid?');">
