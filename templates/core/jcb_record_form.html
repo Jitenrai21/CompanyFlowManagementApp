@@ -8,7 +8,7 @@
         <div class="flex items-center justify-between gap-3">
             <div>
                 <h1 class="text-3xl font-extrabold tracking-tight">{{ form_title }}</h1>
-                <p class="cf-page-subtitle">For expense-only entry, you can submit just Date + Expense Item + Expense Amount.</p>
+                <p class="cf-page-subtitle">For expense-only entry, you can submit just Date, Expense Item and Expense Amount.</p>
             </div>
             <a href="{% url 'jcb_records' %}" class="btn btn-outline">Back to JCB Records</a>
         </div>
@@ -29,6 +29,7 @@
                 {{ form.date }}
                 {% if form.date.errors %}<p class="text-error text-sm mt-1">{{ form.date.errors|join:', ' }}</p>{% endif %}
             </div>
+
             <div class="form-control">
                 <label class="label" for="id_site_name"><span class="label-text">Site Name</span></label>
                 {{ form.site_name }}
@@ -47,7 +48,6 @@
             <div class="form-control">
                 <label class="label" for="jcb_total_preview"><span class="label-text">Total Work Time (auto)</span></label>
                 <input id="jcb_total_preview" type="text" class="input input-bordered w-full" value="0.00" readonly>
-                <p class="text-xs text-base-content/60 mt-1">Calculated as End Time minus Start Time.</p>
             </div>
             <div class="form-control">
                 <label class="label" for="id_rate"><span class="label-text">Rate (NPR / hour)</span></label>
@@ -58,14 +58,23 @@
                 <label class="label" for="id_total_amount"><span class="label-text">Total Amount (editable)</span></label>
                 {{ form.total_amount }}
                 {% if form.total_amount.errors %}<p class="text-error text-sm mt-1">{{ form.total_amount.errors|join:', ' }}</p>{% endif %}
-                <p class="text-xs text-base-content/60 mt-1">Auto-filled as Work Hours x Rate, but you can override.</p>
             </div>
             <div class="form-control">
                 <label class="label" for="id_status"><span class="label-text">Status</span></label>
                 {{ form.status }}
                 {% if form.status.errors %}<p class="text-error text-sm mt-1">{{ form.status.errors|join:', ' }}</p>{% endif %}
             </div>
-
+            <div class="form-control md:col-span-2">
+                <label class="label" for="id_customer_input"><span class="label-text">Customer Assignment (Optional)</span></label>
+                {{ form.customer_input }}
+                <datalist id="jcb-customer-options">
+                    {% for customer in form.fields.customer.queryset %}
+                    <option value="{{ customer.name }}"></option>
+                    {% endfor %}
+                </datalist>
+                {% if form.customer_input.errors %}<p class="text-error text-sm mt-1">{{ form.customer_input.errors|join:', ' }}</p>{% endif %}
+            </div>
+            
             <div class="md:col-span-2">
                 <div class="cf-filter-panel p-4 space-y-3">
                     <h2 class="font-semibold">Optional Expense</h2>

@@ -726,6 +726,93 @@ class MaterialSalesCreditTests(TestCase):
 		self.assertEqual(receipt.amount, Decimal("250.00"))
 
 
+class JCBRecordCustomerAssignmentTests(TestCase):
+	def setUp(self):
+		user_model = get_user_model()
+		self.user = user_model.objects.create_user(username="jcb-user", password="pass1234")
+		self.customer = Customer.objects.create(name="JCB Customer", type=CustomerType.REGULAR)
+
+	def test_jcb_create_accepts_customer_input(self):
+		self.client.login(username="jcb-user", password="pass1234")
+
+		response = self.client.post(
+			reverse("jcb_record_create"),
+			data={
+				"date": bs_today_date().isoformat(),
+				"customer_input": self.customer.name,
+				"site_name": "Site A",
+				"start_time": "1.00",
+				"end_time": "3.50",
+				"status": RecordStatus.PAID,
+				"rate": "2000.00",
+				"total_amount": "5000.00",
+				"expense_item": "",
+				"expense_amount": "",
+			},
+		)
+
+		self.assertEqual(response.status_code, 302)
+		record = JCBRecord.objects.get(site_name="Site A")
+		self.assertEqual(record.customer, self.customer)
+
+		tx = Transaction.objects.get(jcb_record=record, type=TransactionType.INCOME)
+		self.assertEqual(tx.customer, self.customer)
+
+	def test_jcb_create_allows_unassigned_customer(self):
+		self.client.login(username="jcb-user", password="pass1234")
+
+		response = self.client.post(
+			reverse("jcb_record_create"),
+			data={
+				"date": bs_today_date().isoformat(),
+				"customer_input": "",
+				"site_name": "Site B",
+				"start_time": "2.00",
+				"end_time": "4.00",
+				"status": RecordStatus.PAID,
+				"rate": "2000.00",
+				"total_amount": "4000.00",
+				"expense_item": "",
+				"expense_amount": "",
+			},
+		)
+
+		self.assertEqual(response.status_code, 302)
+		record = JCBRecord.objects.get(site_name="Site B")
+		self.assertIsNone(record.customer)
+
+	def test_jcb_records_filter_by_customer_and_unassigned(self):
+		self.client.login(username="jcb-user", password="pass1234")
+
+		assigned = JCBRecord.objects.create(
+			date=bs_today_date(),
+			customer=self.customer,
+			site_name="Assigned Site",
+			start_time=Decimal("1.00"),
+			end_time=Decimal("3.00"),
+			rate=Decimal("2000.00"),
+			status=RecordStatus.PENDING,
+		)
+		unassigned = JCBRecord.objects.create(
+			date=bs_today_date(),
+			site_name="Unassigned Site",
+			start_time=Decimal("1.00"),
+			end_time=Decimal("2.00"),
+			rate=Decimal("2000.00"),
+			status=RecordStatus.PENDING,
+		)
+
+		response_assigned = self.client.get(reverse("jcb_records"), {"customer": str(self.customer.pk)})
+		self.assertEqual(response_assigned.status_code, 200)
+		self.assertContains(response_assigned, assigned.site_name)
+		self.assertNotContains(response_assigned, unassigned.site_name)
+
+		response_unassigned = self.client.get(reverse("jcb_records"), {"customer": "__unassigned__"})
+		self.assertEqual(response_unassigned.status_code, 200)
+		self.assertContains(response_unassigned, unassigned.site_name)
+		self.assertNotContains(response_unassigned, assigned.site_name)
+
+
 class AlertsWorkflowTests(TestCase):
 	def setUp(self):
 		user_model = get_user_model()

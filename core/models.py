@@ -229,6 +229,13 @@ class Sale(TimeStampedModel):
 class JCBRecord(TimeStampedModel):
     date = models.DateField(default=timezone.now)
     bs_date = models.CharField(max_length=10, blank=True, null=True, db_index=True)
+    customer = models.ForeignKey(
+        Customer,
+        on_delete=models.SET_NULL,
+        related_name="jcb_records",
+        blank=True,
+        null=True,
+    )
     site_name = models.CharField(max_length=120, blank=True, null=True)
     start_time = models.DecimalField(max_digits=7, decimal_places=2, default=Decimal("0.00"))
     end_time = models.DecimalField(max_digits=7, decimal_places=2, default=Decimal("0.00"))
@@ -248,6 +255,7 @@ class JCBRecord(TimeStampedModel):
         indexes = [
             models.Index(fields=["date"]),
             models.Index(fields=["status"]),
+            models.Index(fields=["customer"]),
         ]
 
     def __str__(self) -> str:

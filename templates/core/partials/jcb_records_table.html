@@ -18,6 +18,7 @@
                     <th>Rate</th>
                     <th>Income</th>
                     <th>Expense</th>
+                    <th>Customer</th>
                     <th class="text-right whitespace-nowrap">Actions</th>
                 </tr>
             </thead>
@@ -43,6 +44,13 @@
                     <td><span class="text-base-content/50 italic">N/A</span></td>
                     <td><span class="text-base-content/50 italic">N/A</span></td>
                     <td>{{ record.expense_item }} (NPR {{ record.expense_amount|npr_amount }})</td>
+                    <td>
+                        {% if record.customer %}
+                        <a href="{% url 'customer_detail' record.customer.id %}" class="link link-primary">{{ record.customer.name }}</a>
+                        {% else %}
+                        <span class="text-base-content/50">Unassigned</span>
+                        {% endif %}
+                    </td>
                     <td class="text-right align-middle">
                         <div class="inline-flex min-h-8 items-center justify-end gap-1 whitespace-nowrap">
                             <div class="hidden md:flex items-center justify-end gap-1">
@@ -113,6 +121,13 @@
                         <span class="text-base-content/50">None</span>
                         {% endif %}
                     </td>
+                    <td>
+                        {% if record.customer %}
+                        <a href="{% url 'customer_detail' record.customer.id %}" class="link link-primary">{{ record.customer.name }}</a>
+                        {% else %}
+                        <span class="text-base-content/50">Unassigned</span>
+                        {% endif %}
+                    </td>
                     <td class="text-right align-middle">
                         <div class="inline-flex min-h-8 items-center justify-end gap-1 whitespace-nowrap">
                             <div class="hidden md:flex items-center justify-end gap-1">
@@ -172,7 +187,7 @@
                 {% endif %}
                 {% empty %}
                 <tr>
-                    <td colspan="11" class="py-0">
+                    <td colspan="12" class="py-0">
                         <div class="cf-empty">
                             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M3 4a1 1 0 011-1h12a1 1 0 010 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h8a1 1 0 010 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 010 2H4a1 1 0 01-1-1z" /></svg>
                             <p>No JCB records found for the selected filters.</p>
@@ -192,8 +207,8 @@
         <div class="join">
             {% if page_obj.has_previous %}
             <a
-                href="{% url 'jcb_records' %}?q={{ filters.q|urlencode }}&status={{ filters.status }}&date_from={{ filters.date_from }}&date_to={{ filters.date_to }}&sort={{ filters.sort }}&page={{ page_obj.previous_page_number }}"
-                hx-get="{% url 'jcb_records' %}?q={{ filters.q|urlencode }}&status={{ filters.status }}&date_from={{ filters.date_from }}&date_to={{ filters.date_to }}&sort={{ filters.sort }}&page={{ page_obj.previous_page_number }}"
+                href="{% url 'jcb_records' %}?q={{ filters.q|urlencode }}&status={{ filters.status }}&customer={{ filters.customer }}&date_from={{ filters.date_from }}&date_to={{ filters.date_to }}&sort={{ filters.sort }}&page={{ page_obj.previous_page_number }}"
+                hx-get="{% url 'jcb_records' %}?q={{ filters.q|urlencode }}&status={{ filters.status }}&customer={{ filters.customer }}&date_from={{ filters.date_from }}&date_to={{ filters.date_to }}&sort={{ filters.sort }}&page={{ page_obj.previous_page_number }}"
                 hx-target="#jcb-table-container"
                 hx-push-url="true"
                 class="btn btn-sm join-item"
@@ -203,8 +218,8 @@
             {% endif %}
             {% if page_obj.has_next %}
             <a
-                href="{% url 'jcb_records' %}?q={{ filters.q|urlencode }}&status={{ filters.status }}&date_from={{ filters.date_from }}&date_to={{ filters.date_to }}&sort={{ filters.sort }}&page={{ page_obj.next_page_number }}"
-                hx-get="{% url 'jcb_records' %}?q={{ filters.q|urlencode }}&status={{ filters.status }}&date_from={{ filters.date_from }}&date_to={{ filters.date_to }}&sort={{ filters.sort }}&page={{ page_obj.next_page_number }}"
+                href="{% url 'jcb_records' %}?q={{ filters.q|urlencode }}&status={{ filters.status }}&customer={{ filters.customer }}&date_from={{ filters.date_from }}&date_to={{ filters.date_to }}&sort={{ filters.sort }}&page={{ page_obj.next_page_number }}"
+                hx-get="{% url 'jcb_records' %}?q={{ filters.q|urlencode }}&status={{ filters.status }}&customer={{ filters.customer }}&date_from={{ filters.date_from }}&date_to={{ filters.date_to }}&sort={{ filters.sort }}&page={{ page_obj.next_page_number }}"
                 hx-target="#jcb-table-container"
                 hx-push-url="true"
                 class="btn btn-sm join-item"

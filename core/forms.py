@@ -408,10 +408,13 @@ class SaleReceiptForm(forms.ModelForm):
 
 
 class JCBRecordForm(forms.ModelForm):
+    customer_input = forms.CharField(required=False)
+
     class Meta:
         model = JCBRecord
         fields = [
             "date",
+            "customer",
             "site_name",
             "start_time",
             "end_time",
@@ -432,6 +435,7 @@ class JCBRecordForm(forms.ModelForm):
 
     def clean(self):
         cleaned_data = super().clean()
+        customer_name = (cleaned_data.get("customer_input") or "").strip()
         start_time = cleaned_data.get("start_time")
         end_time = cleaned_data.get("end_time")
         expense_item = (cleaned_data.get("expense_item") or "").strip()
@@ -450,6 +454,14 @@ class JCBRecordForm(forms.ModelForm):
             and Decimal(str(end_time)) == Decimal("0")
         )
         expense_only_mode = has_expense_item and has_expense_amount and (has_no_time_input or has_zero_time_input)
+
+        if customer_name:
+            customer = Customer.objects.filter(name__iexact=customer_name).order_by("name").first()
+            if customer is None:
+                customer = Customer.objects.create(name=customer_name)
+            cleaned_data["customer"] = customer
+        else:
+            cleaned_data["customer"] = None
 
         if has_expense_item and not has_expense_amount:
             self.add_error("expense_amount", "Enter expense amount when expense item is provided.")
@@ -510,11 +522,18 @@ class JCBRecordForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         self.calendar_mode = _resolve_form_calendar_mode(kwargs)
         super().__init__(*args, **kwargs)
+        self.fields["customer"].required = False
+        self.fields["customer"].queryset = Customer.objects.order_by("name")
+        self.fields["customer_input"].widget.attrs["placeholder"] = "Type or choose a customer name"
+        self.fields["customer_input"].widget.attrs["autocomplete"] = "off"
+        self.fields["customer_input"].widget.attrs["list"] = "jcb-customer-options"
         self.fields["start_time"].required = False
         self.fields["end_time"].required = False
         self.fields["rate"].required = False
         self.fields["status"].required = False
         self.fields["total_amount"].required = False
+        if self.instance and self.instance.pk and self.instance.customer:
+            self.initial["customer_input"] = self.instance.customer.name
         if self.instance and self.instance.pk and self.instance.total_amount is None:
             worked = self.instance.end_time - self.instance.start_time
             if worked > 0:

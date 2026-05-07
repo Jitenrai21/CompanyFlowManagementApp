@@ -60,6 +60,33 @@
                     <p><span class="font-semibold">Due Date:</span> {% if record.due_date %}{{ record.due_date|calendar_date:request }}{% else %}<span class="text-base-content/60">-</span>{% endif %}</p>
                     <p class="md:col-span-2"><span class="font-semibold">Notes:</span> {{ record.notes|default:'-' }}</p>
                 </div>
+                {% if record.record_type == 'sale' %}
+                <div>
+                    <p class="font-semibold text-sm mb-1">Itemized List</p>
+                    <div class="overflow-x-auto">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Item</th>
+                                    <th class="text-right">Unit</th>
+                                    <th class="text-right">Qty</th>
+                                    <th class="text-right">Price</th>
+                                    <th class="text-right">Amount</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>{{ module_label }} Sale</td>
+                                    <td class="text-right">{{ record.get_unit_type_display|default:'' }}</td>
+                                    <td class="text-right">{{ record.quantity|default:1 }}</td>
+                                    <td class="text-right">NPR {{ record.price_per_unit|default_if_none:0|npr_amount }}</td>
+                                    <td class="text-right">NPR {{ record.sale_income|default:record.price_per_unit|npr_amount }}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                {% endif %}
             </div>
         </div>
 

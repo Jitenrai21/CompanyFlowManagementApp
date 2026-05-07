@@ -96,8 +96,22 @@ def _customer_due_amount_from_sales(customer):
 		total_paid=Coalesce(Sum("paid_amount"), Value(Decimal("0.00"))),
 	)
 	material_pending = _customer_material_pending_total(customer)
+	jcb_pending = customer.jcb_records.filter(status=RecordStatus.PENDING).aggregate(
+		total=Coalesce(
+			Sum(
+				Coalesce(
+					"total_amount",
+					ExpressionWrapper(
+						F("total_work_hours") * F("rate"),
+						output_field=DecimalField(max_digits=14, decimal_places=2),
+					),
+				),
+			),
+			Value(Decimal("0.00")),
+		)
+	)["total"]
 	return _calculate_customer_due_amount(
-		payment_totals["total_sales"] + material_pending,
+		payment_totals["total_sales"] + material_pending + jcb_pending,
 		payment_totals["total_paid"],
 		customer.manual_due_amount,
 		customer.credit_balance,
@@ -1499,12 +1513,14 @@ def _sync_jcb_transactions(jcb_record):
 			income_txn.amount = income_amount
 			income_txn.payment_method = PaymentMethod.CASH
 			income_txn.description = income_description
+			income_txn.customer = jcb_record.customer
 			income_txn.save(
 				update_fields=[
 					"date",
 					"amount",
 					"payment_method",
 					"description",
+					"customer",
 					"updated_at",
 				]
 			)
@@ -1517,6 +1533,7 @@ def _sync_jcb_transactions(jcb_record):
 				payment_method=PaymentMethod.CASH,
 				category=jcb_income_category,
 				description=income_description,
+				customer=jcb_record.customer,
 				jcb_record=jcb_record,
 			)
 	else:
@@ -1535,12 +1552,14 @@ def _sync_jcb_transactions(jcb_record):
 			expense_txn.amount = jcb_record.expense_amount
 			expense_txn.payment_method = PaymentMethod.CASH
 			expense_txn.description = expense_description
+			expense_txn.customer = jcb_record.customer
 			expense_txn.save(
 				update_fields=[
 					"date",
 					"amount",
 					"payment_method",
 					"description",
+					"customer",
 					"updated_at",
 				]
 			)
@@ -1553,6 +1572,7 @@ def _sync_jcb_transactions(jcb_record):
 				payment_method=PaymentMethod.CASH,
 				category=jcb_expense_category,
 				description=expense_description,
+				customer=jcb_record.customer,
 				jcb_record=jcb_record,
 			)
 	else:
@@ -1664,7 +1684,24 @@ def _customer_payment_context(customer, request):
 
 	pending_material_rows = _material_pending_rows_for_customer(customer)
 	pending_material_total = sum((row["pending_amount"] for row in pending_material_rows), Decimal("0.00"))
-	pending_item_count = len(pending_sales_rows) + len(pending_material_rows)
+	pending_jcb_rows = []
+	for record in customer.jcb_records.filter(status=RecordStatus.PENDING).order_by("date", "created_at", "id"):
+		total = record.total_amount
+		if total in (None, ""):
+			total = (record.total_work_hours or Decimal("0.00")) * (record.rate or Decimal("0.00"))
+		total = Decimal(str(total or Decimal("0.00"))).quantize(Decimal("0.01"))
+		if total <= 0:
+			continue
+		pending_jcb_rows.append(
+			{
+				"label": "JCB",
+				"record": record,
+				"pending_amount": total,
+				"descriptor": f"{record.site_name or 'JCB work'} | {record.total_work_hours} hrs @ NPR {record.rate}",
+			}
+		)
+
+	pending_item_count = len(pending_sales_rows) + len(pending_material_rows) + len(pending_jcb_rows)
 
 	pending_payment_rows = []
 	for row in pending_sales_rows:
@@ -1705,6 +1742,24 @@ def _customer_payment_context(customer, request):
 				"status": record.get_payment_status_display(),
 				"sale_id": None,
 				"detail_url": detail_url,
+			}
+		)
+
+	for row in pending_jcb_rows:
+		record = row["record"]
+		pending_payment_rows.append(
+			{
+				"source": row["label"],
+				"kind": "module",
+				"reference": f"#{record.id}",
+				"date": record.date,
+				"details": row["descriptor"],
+				"total": row["pending_amount"],
+				"paid": Decimal("0.00"),
+				"due": row["pending_amount"],
+				"status": record.get_status_display(),
+				"sale_id": None,
+				"detail_url": reverse("jcb_record_edit", args=[record.id]),
 			}
 		)
 
@@ -2072,7 +2127,7 @@ def transaction_delete(request, pk):
 @login_required
 def jcb_records(request):
 	default_from, default_to = _get_default_date_range()
-	queryset = JCBRecord.objects.all().annotate(
+	queryset = JCBRecord.objects.select_related("customer").all().annotate(
 		income_amount_calc=Coalesce(
 			F("total_amount"),
 			ExpressionWrapper(
@@ -2084,6 +2139,7 @@ def jcb_records(request):
 
 	query = request.GET.get("q", "").strip()
 	status = request.GET.get("status", "").strip()
+	customer_id = request.GET.get("customer", "").strip()
 	date_filters = _resolve_request_date_filters(
 		request,
 		default_from=default_from,
@@ -2098,6 +2154,7 @@ def jcb_records(request):
 			Q(site_name__icontains=query)
 			| Q(expense_item__icontains=query)
 			| Q(status__icontains=query)
+			| Q(customer__name__icontains=query)
 		)
 	if status:
 		queryset = queryset.filter(status=status).exclude(
@@ -2106,6 +2163,10 @@ def jcb_records(request):
 			& ~Q(expense_item="")
 			& Q(expense_amount__isnull=False)
 		)
+	if customer_id == UNASSIGNED_CUSTOMER_FILTER:
+		queryset = queryset.filter(customer__isnull=True)
+	elif customer_id:
+		queryset = queryset.filter(customer_id=customer_id)
 	if date_from:
 		queryset = queryset.filter(date__gte=date_from)
 	if date_to:
@@ -2127,9 +2188,11 @@ def jcb_records(request):
 	context = {
 		"jcb_records": page_obj.object_list,
 		"page_obj": page_obj,
+		"customers": Customer.objects.order_by("name"),
 		"filters": {
 			"q": query,
 			"status": status,
+			"customer": customer_id,
 			"date_from": date_filters["date_from_display"],
 			"date_to": date_filters["date_to_display"],
 			"sort": sort,
