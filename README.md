@@ -2,7 +2,7 @@
 
 A focused Django application for small-to-medium construction and materials businesses to track sales, customer balances, cashflow, machinery (JCB) operations, and inventory-like material records (cement, blocks, bamboo) — with practical tools for due-date alerts and exportable reporting.
 
-This README documents the current state of the project (April 2026), highlights recent enhancements, explains core modules and workflows, and provides developer setup and maintenance instructions suitable for a GitHub repository.
+This README documents the current state of the project (May 2026), highlights recent enhancements, explains core modules and workflows, and provides developer setup and maintenance instructions suitable for a GitHub repository.
 
 ---
 
@@ -34,12 +34,17 @@ Company Flow Management App provides day-to-day operational tracking for busines
 
 The app favors pragmatic UX (partial updates via HTMX, compact item entry tables) and stores flexible sale item lines in a JSONField to avoid frequent migrations while allowing schema changes in validation and UI.
 
-## Recent enhancements (April 2026)
+## Recent enhancements (May 2026)
 
 - Added optional `unit` per sale item (dropdown choices include "Nissan", "Tipper", "Bora", "Pieces"). Existing legacy sale item lines remain valid and keep a blank unit when not present.
 - Sales export extended with item-level columns: Items, Quantity Sold, Units Seen, and Item Lines (CSV/PDF exports now include useful per-item summaries).
 - Sales item entry UI improvements: horizontally-scrollable table on narrow screens, reduced item column width, swapped Unit and Qty columns, and Add Item auto-focuses the new row's Item field.
 - Form UX: `due_date` in blocks/cement/bamboo forms defaults to today's date on new forms (client-side fallback) to reduce accidental empty due-dates.
+- Material sale detail pages (blocks/cement/bamboo) now include an itemized-style sale breakdown table for parity with core sales detail UX.
+- JCB records now support optional customer assignment (type/select customer, create-on-miss behavior), with customer visibility in JCB list views.
+- JCB customer workflow improvements: pending JCB amounts are now included in customer due and pending payment context, so assigned JCB work is visible in customer profile dues.
+- JCB list filtering now supports customer and unassigned records for faster reconciliation.
+- Customer payment summary messaging was improved to reflect allocations more accurately, including material allocation visibility in payment breakdown context.
 - Navbar/topbar responsive tweaks to avoid action compression on smaller screens and to hide brand text under narrow viewports.
 
 Files touched by these changes (quick links):
@@ -53,10 +58,16 @@ Files touched by these changes (quick links):
 - [templates/core/blocks_record_form.html](templates/core/blocks_record_form.html)
 - [templates/core/cement_record_form.html](templates/core/cement_record_form.html)
 - [templates/core/bamboo_record_form.html](templates/core/bamboo_record_form.html)
+- [templates/core/material_record_detail.html](templates/core/material_record_detail.html)
+- [templates/core/jcb_record_form.html](templates/core/jcb_record_form.html)
+- [templates/core/jcb_records.html](templates/core/jcb_records.html)
+- [templates/core/partials/jcb_records_table.html](templates/core/partials/jcb_records_table.html)
+- [core/views.py](core/views.py)
 
 Notes:
 - No database migration was required because sale item lines continue to live in `Sale.items` (a JSONField). Validation and front-end payloads were updated instead.
 - Form validation accepts blank `unit` for legacy entries and rejects unknown unit values.
+- Optional customer assignment for JCB records uses nullable foreign key behavior and remains backward-compatible with legacy unassigned records.
 
 ---
 
@@ -74,6 +85,7 @@ The app is split into focused modules under the `core` app. Major capabilities:
 - Customers
   - Customer profiles with optional `credit_balance`, `opening_balance`, and a `manual_due_amount` for legacy adjustments.
   - Allocate customer payments to multiple pending invoices with allocation history.
+  - Pending due context now combines core sales, material sales, and assigned pending JCB work for clearer customer-level receivables.
 
 - Transactions / Finance Ledger
   - Categorized income/expense transactions with optional attachment and links to customers, sales, or records.
@@ -81,7 +93,9 @@ The app is split into focused modules under the `core` app. Major capabilities:
 
 - Machine (JCB) records
   - Track start/end times, calculated total work hours, rate-based income, and optional expense items.
+  - Optional customer assignment on JCB entries (existing customer or create by name).
   - Mark paid/unpaid and include in transaction linking.
+  - Customer-aware list filtering and unassigned-record filtering.
 
 - Tipper records
   - Track per-item expense or value-added entries with optional descriptions and simple analytics.
@@ -105,7 +119,7 @@ The app is split into focused modules under the `core` app. Major capabilities:
 - `Customer`: profile data, `opening_balance`, `credit_balance`, `manual_due_amount`.
 - `Sale`: invoice metadata, `items` (JSON list of item dicts), `total_amount`, `paid_amount`, `due_date`, `alert_enabled`.
 - `Transaction`: income/expense records; may link to `Sale`, `Customer`, `JCBRecord`, and material records.
-- `JCBRecord`: machine run logs with `start_time`, `end_time`, `total_work_hours`, `rate`, and calculated `total_amount`.
+- `JCBRecord`: machine run logs with `start_time`, `end_time`, `total_work_hours`, `rate`, calculated `total_amount`, and optional `customer` assignment.
 - `TipperRecord` & `TipperItem`: tipper-specific records and normalized items.
 - `BlocksRecord`, `CementRecord`, `BambooRecord`: domain-specific material records.
 - `AlertNotification`: centralized alert entries for overdue/upcoming/manual items.
@@ -128,6 +142,11 @@ Relationships: `Customer` 1:N `Sale` and `Transaction`; `Sale` 1:N `Transaction`
 
 - Customer Payment Allocation
   - Create a `CustomerPayment` and allocate amounts across multiple customer invoices using the allocation UI.
+
+- Create a JCB Record with Optional Customer
+  1. Go to JCB Records -> Add JCB Record.
+  2. Optionally assign a customer (type an existing name or a new one).
+  3. Save the record. Assigned JCB entries participate in customer due/pending views, and paid JCB entries sync customer-linked income transactions.
 
 - Alerts
   - Alerts are auto-generated for sales with `alert_enabled` and `due_date` via the management command `process_alert_notifications` or background scheduler.
@@ -213,6 +232,11 @@ Key templates and modules:
 - Template partial: [templates/core/partials/sales_table.html](templates/core/partials/sales_table.html) — sales ledger table used across list views and exports
 - Core module: [core/forms.py](core/forms.py) — form validation, including `SALE_ITEM_UNIT_OPTIONS` and `SaleForm.clean_items`
 - Core module: [core/report_exports.py](core/report_exports.py) — export definitions and item summarization logic
+- Template: [templates/core/material_record_detail.html](templates/core/material_record_detail.html) — shared detail view for blocks/cement/bamboo with sale itemized-style table section
+- Template: [templates/core/jcb_record_form.html](templates/core/jcb_record_form.html) — JCB entry form with optional customer assignment
+- Template: [templates/core/jcb_records.html](templates/core/jcb_records.html) — JCB list/filter UI (includes customer filter)
+- Template partial: [templates/core/partials/jcb_records_table.html](templates/core/partials/jcb_records_table.html) — JCB listing table with customer column
+- Core module: [core/views.py](core/views.py) — customer due aggregation, JCB transaction sync, and list filtering logic
 - Base template: [templates/base.html](templates/base.html) — navbar / topbar responsive tweaks
 
 Main routes (examples)
@@ -228,6 +252,7 @@ Main routes (examples)
 
 ## Changelog (short)
 
+- 2026-05-07 — Added optional customer assignment flow for JCB records; JCB customer filtering; customer-profile due/pending aggregation now includes assigned pending JCB work; material sale detail pages now show itemized-style sale breakdown.
 - 2026-04-28 — Added optional `unit` for sale items; extended sales exports with item-level columns; sales UI and due_date defaults; navbar responsive fixes.
 - (Previous entries retained in project `roadmap.txt` and commit history.)
 
