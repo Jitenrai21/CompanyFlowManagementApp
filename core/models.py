@@ -247,6 +247,8 @@ class JCBRecord(TimeStampedModel):
     )
     rate = models.DecimalField(max_digits=12, decimal_places=2, default=2000)
     total_amount = models.DecimalField(max_digits=14, decimal_places=2, blank=True, null=True)
+    paid_amount = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    pending_amount = models.DecimalField(max_digits=14, decimal_places=2, default=0)
     expense_item = models.CharField(max_length=120, blank=True)
     expense_amount = models.DecimalField(max_digits=12, decimal_places=2, blank=True, null=True)
 
@@ -280,6 +282,18 @@ class JCBRecord(TimeStampedModel):
         self.total_work_hours = worked.quantize(Decimal("0.01"))
         if self.total_amount is None:
             self.total_amount = (self.total_work_hours * self.rate).quantize(Decimal("0.01"))
+
+        total_amount = (self.total_amount or Decimal("0.00")).quantize(Decimal("0.01"))
+        paid_amount = (self.paid_amount or Decimal("0.00")).quantize(Decimal("0.01"))
+        if paid_amount < 0:
+            paid_amount = Decimal("0.00")
+        if total_amount > 0 and paid_amount > total_amount:
+            paid_amount = total_amount
+
+        self.total_amount = total_amount
+        self.paid_amount = paid_amount
+        self.pending_amount = max(total_amount - paid_amount, Decimal("0.00")).quantize(Decimal("0.01"))
+        self.status = RecordStatus.PAID if total_amount > 0 and self.pending_amount == 0 else RecordStatus.PENDING
         self.bs_date = ad_to_bs_string(self.date)
         super().save(*args, **kwargs)
 

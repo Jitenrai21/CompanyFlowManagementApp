@@ -58,11 +58,23 @@
                 <label class="label" for="id_total_amount"><span class="label-text">Total Amount (editable)</span></label>
                 {{ form.total_amount }}
                 {% if form.total_amount.errors %}<p class="text-error text-sm mt-1">{{ form.total_amount.errors|join:', ' }}</p>{% endif %}
+                <p class="text-xs text-base-content/60 mt-1">Auto-filled as Work Hours x Rate, but you can override.</p>
+            </div>
+            <div class="form-control">
+                <label class="label" for="id_paid_amount"><span class="label-text">Paid Amount (NPR)</span></label>
+                {{ form.paid_amount }}
+                {% if form.paid_amount.errors %}<p class="text-error text-sm mt-1">{{ form.paid_amount.errors|join:', ' }}</p>{% endif %}
+                <p class="text-xs text-base-content/60 mt-1">Enter the amount already received. The remaining balance is shown below.</p>
+            </div>
+            <div class="form-control">
+                <label class="label" for="jcb_pending_preview"><span class="label-text">Pending Amount (auto)</span></label>
+                <input id="jcb_pending_preview" type="text" class="input input-bordered w-full" value="0.00" readonly>
             </div>
             <div class="form-control">
                 <label class="label" for="id_status"><span class="label-text">Status</span></label>
                 {{ form.status }}
                 {% if form.status.errors %}<p class="text-error text-sm mt-1">{{ form.status.errors|join:', ' }}</p>{% endif %}
+                <p class="text-xs text-base-content/60 mt-1">Status is auto-synced from paid and pending amounts when saved.</p>
             </div>
             <div class="form-control md:col-span-2">
                 <label class="label" for="id_customer_input"><span class="label-text">Customer Assignment (Optional)</span></label>
@@ -119,9 +131,11 @@
         const endTimeField = document.getElementById('id_end_time');
         const rateField = document.getElementById('id_rate');
         const totalAmountField = document.getElementById('id_total_amount');
+        const paidAmountField = document.getElementById('id_paid_amount');
         const previewField = document.getElementById('jcb_total_preview');
+        const pendingPreviewField = document.getElementById('jcb_pending_preview');
 
-        if (!startTimeField || !endTimeField || !rateField || !totalAmountField || !previewField) {
+        if (!startTimeField || !endTimeField || !rateField || !totalAmountField || !paidAmountField || !previewField || !pendingPreviewField) {
             return;
         }
 
@@ -137,25 +151,30 @@
             const start = parseDecimal(startTimeField.value);
             const end = parseDecimal(endTimeField.value);
             const rate = parseDecimal(rateField.value);
+            const total = parseDecimal(totalAmountField.value) || 0;
+            const paid = parseDecimal(paidAmountField.value) || 0;
 
             if (start === null || end === null) {
                 previewField.value = '0.00';
-                return;
+            } else {
+                const totalWorked = end - start;
+                const worked = totalWorked > 0 ? totalWorked : 0;
+                previewField.value = worked.toFixed(2);
+
+                if (!manualTotalOverride) {
+                    const computedAmount = worked > 0 && rate !== null ? worked * rate : 0;
+                    totalAmountField.value = computedAmount.toFixed(2);
+                }
             }
 
-            const total = end - start;
-            const worked = total > 0 ? total : 0;
-            previewField.value = worked.toFixed(2);
-
-            if (!manualTotalOverride) {
-                const computedAmount = worked > 0 && rate !== null ? worked * rate : 0;
-                totalAmountField.value = computedAmount.toFixed(2);
-            }
+            pendingPreviewField.value = Math.max(total - paid, 0).toFixed(2);
         }
 
         totalAmountField.addEventListener('input', function () {
             manualTotalOverride = true;
+            updatePreview();
         });
+        paidAmountField.addEventListener('input', updatePreview);
         startTimeField.addEventListener('input', updatePreview);
         endTimeField.addEventListener('input', updatePreview);
         rateField.addEventListener('input', updatePreview);

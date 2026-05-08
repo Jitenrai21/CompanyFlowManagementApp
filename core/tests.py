@@ -758,6 +758,36 @@ class JCBRecordCustomerAssignmentTests(TestCase):
 		tx = Transaction.objects.get(jcb_record=record, type=TransactionType.INCOME)
 		self.assertEqual(tx.customer, self.customer)
 
+	def test_jcb_create_supports_partial_payment(self):
+		self.client.login(username="jcb-user", password="pass1234")
+
+		response = self.client.post(
+			reverse("jcb_record_create"),
+			data={
+				"date": bs_today_date().isoformat(),
+				"customer_input": self.customer.name,
+				"site_name": "Site Partial",
+				"start_time": "1.00",
+				"end_time": "3.50",
+				"status": RecordStatus.PENDING,
+				"rate": "2000.00",
+				"total_amount": "5000.00",
+				"paid_amount": "1500.00",
+				"expense_item": "",
+				"expense_amount": "",
+			},
+		)
+
+		self.assertEqual(response.status_code, 302)
+		record = JCBRecord.objects.get(site_name="Site Partial")
+		self.assertEqual(record.paid_amount, Decimal("1500.00"))
+		self.assertEqual(record.pending_amount, Decimal("3500.00"))
+		self.assertEqual(record.status, RecordStatus.PENDING)
+
+		tx = Transaction.objects.get(jcb_record=record, type=TransactionType.INCOME)
+		self.assertEqual(tx.amount, Decimal("1500.00"))
+		self.assertEqual(tx.customer, self.customer)
+
 	def test_jcb_create_allows_unassigned_customer(self):
 		self.client.login(username="jcb-user", password="pass1234")
 
