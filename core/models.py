@@ -283,17 +283,29 @@ class JCBRecord(TimeStampedModel):
         if self.total_amount is None:
             self.total_amount = (self.total_work_hours * self.rate).quantize(Decimal("0.01"))
 
-        total_amount = (self.total_amount or Decimal("0.00")).quantize(Decimal("0.01"))
-        paid_amount = (self.paid_amount or Decimal("0.00")).quantize(Decimal("0.01"))
+        income_amount = self.income_amount if self.total_amount is not None else Decimal("0.00")
+        if income_amount < 0:
+            income_amount = Decimal("0.00")
+
+        paid_amount = Decimal(str(self.paid_amount or Decimal("0.00")))
         if paid_amount < 0:
             paid_amount = Decimal("0.00")
-        if total_amount > 0 and paid_amount > total_amount:
-            paid_amount = total_amount
 
-        self.total_amount = total_amount
-        self.paid_amount = paid_amount
-        self.pending_amount = max(total_amount - paid_amount, Decimal("0.00")).quantize(Decimal("0.01"))
-        self.status = RecordStatus.PAID if total_amount > 0 and self.pending_amount == 0 else RecordStatus.PENDING
+        if income_amount > 0 and paid_amount > income_amount:
+            paid_amount = income_amount
+        if income_amount <= 0:
+            paid_amount = Decimal("0.00")
+
+        pending_amount = income_amount - paid_amount if income_amount > 0 else Decimal("0.00")
+        if pending_amount < 0:
+            pending_amount = Decimal("0.00")
+
+        self.paid_amount = paid_amount.quantize(Decimal("0.01"))
+        self.pending_amount = pending_amount.quantize(Decimal("0.01"))
+
+        if income_amount > 0:
+            self.status = RecordStatus.PAID if self.pending_amount == Decimal("0.00") else RecordStatus.PENDING
+
         self.bs_date = ad_to_bs_string(self.date)
         super().save(*args, **kwargs)
 

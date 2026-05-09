@@ -758,36 +758,6 @@ class JCBRecordCustomerAssignmentTests(TestCase):
 		tx = Transaction.objects.get(jcb_record=record, type=TransactionType.INCOME)
 		self.assertEqual(tx.customer, self.customer)
 
-	def test_jcb_create_supports_partial_payment(self):
-		self.client.login(username="jcb-user", password="pass1234")
-
-		response = self.client.post(
-			reverse("jcb_record_create"),
-			data={
-				"date": bs_today_date().isoformat(),
-				"customer_input": self.customer.name,
-				"site_name": "Site Partial",
-				"start_time": "1.00",
-				"end_time": "3.50",
-				"status": RecordStatus.PENDING,
-				"rate": "2000.00",
-				"total_amount": "5000.00",
-				"paid_amount": "1500.00",
-				"expense_item": "",
-				"expense_amount": "",
-			},
-		)
-
-		self.assertEqual(response.status_code, 302)
-		record = JCBRecord.objects.get(site_name="Site Partial")
-		self.assertEqual(record.paid_amount, Decimal("1500.00"))
-		self.assertEqual(record.pending_amount, Decimal("3500.00"))
-		self.assertEqual(record.status, RecordStatus.PENDING)
-
-		tx = Transaction.objects.get(jcb_record=record, type=TransactionType.INCOME)
-		self.assertEqual(tx.amount, Decimal("1500.00"))
-		self.assertEqual(tx.customer, self.customer)
-
 	def test_jcb_create_allows_unassigned_customer(self):
 		self.client.login(username="jcb-user", password="pass1234")
 
@@ -841,6 +811,62 @@ class JCBRecordCustomerAssignmentTests(TestCase):
 		self.assertEqual(response_unassigned.status_code, 200)
 		self.assertContains(response_unassigned, unassigned.site_name)
 		self.assertNotContains(response_unassigned, assigned.site_name)
+
+	def test_jcb_create_partial_payment_syncs_pending_and_income_transaction(self):
+		self.client.login(username="jcb-user", password="pass1234")
+
+		response = self.client.post(
+			reverse("jcb_record_create"),
+			data={
+				"date": bs_today_date().isoformat(),
+				"customer_input": self.customer.name,
+				"site_name": "Partial Site",
+				"start_time": "1.00",
+				"end_time": "3.50",
+				"status": RecordStatus.PENDING,
+				"rate": "2000.00",
+				"total_amount": "5000.00",
+				"paid_amount": "1500.00",
+				"expense_item": "",
+				"expense_amount": "",
+			},
+		)
+
+		self.assertEqual(response.status_code, 302)
+		record = JCBRecord.objects.get(site_name="Partial Site")
+		self.assertEqual(record.paid_amount, Decimal("1500.00"))
+		self.assertEqual(record.pending_amount, Decimal("3500.00"))
+		self.assertEqual(record.status, RecordStatus.PENDING)
+
+		tx = Transaction.objects.get(jcb_record=record, type=TransactionType.INCOME)
+		self.assertEqual(tx.amount, Decimal("1500.00"))
+		self.assertEqual(tx.customer, self.customer)
+
+	def test_jcb_mark_paid_completes_remaining_amount(self):
+		self.client.login(username="jcb-user", password="pass1234")
+
+		record = JCBRecord.objects.create(
+			date=bs_today_date(),
+			customer=self.customer,
+			site_name="Mark Paid Site",
+			start_time=Decimal("1.00"),
+			end_time=Decimal("4.00"),
+			rate=Decimal("2000.00"),
+			total_amount=Decimal("6000.00"),
+			paid_amount=Decimal("2000.00"),
+			status=RecordStatus.PENDING,
+		)
+
+		response = self.client.post(reverse("jcb_record_mark_paid", args=[record.id]), data={"next": reverse("jcb_records")})
+		self.assertEqual(response.status_code, 302)
+
+		record.refresh_from_db()
+		self.assertEqual(record.status, RecordStatus.PAID)
+		self.assertEqual(record.paid_amount, Decimal("6000.00"))
+		self.assertEqual(record.pending_amount, Decimal("0.00"))
+
+		tx = Transaction.objects.get(jcb_record=record, type=TransactionType.INCOME)
+		self.assertEqual(tx.amount, Decimal("6000.00"))
 
 
 class AlertsWorkflowTests(TestCase):

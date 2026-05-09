@@ -583,7 +583,19 @@ def _dashboard_context(request=None, date_from="", date_to=""):
 
 	jcb_summary_raw = jcb_queryset.aggregate(
 		total_work_hours_sum=Coalesce(Sum("total_work_hours"), Value(Decimal("0.00"))),
-		total_jcb_income=Coalesce(Sum("paid_amount"), Value(Decimal("0.00"))),
+		total_jcb_income=Coalesce(
+			Sum(
+				Coalesce(
+					F("total_amount"),
+					ExpressionWrapper(
+						F("total_work_hours") * F("rate"),
+						output_field=DecimalField(max_digits=14, decimal_places=2),
+					),
+				),
+				filter=Q(status=RecordStatus.PAID),
+			),
+			Value(Decimal("0.00")),
+		),
 		total_jcb_expense=Coalesce(Sum("expense_amount"), Value(Decimal("0.00"))),
 	)
 	jcb_summary = {
@@ -592,8 +604,22 @@ def _dashboard_context(request=None, date_from="", date_to=""):
 		"total_jcb_expense": jcb_summary_raw["total_jcb_expense"],
 	}
 	jcb_summary["net_value"] = jcb_summary["total_jcb_income"] - jcb_summary["total_jcb_expense"]
-	jcb_summary["outstanding_receivables"] = jcb_queryset.aggregate(
-		total=Coalesce(Sum("pending_amount"), Value(Decimal("0.00")))
+	jcb_summary["outstanding_receivables"] = jcb_queryset.filter(
+		status=RecordStatus.PENDING,
+		total_work_hours__gt=0,
+	).aggregate(
+		total=Coalesce(
+			Sum(
+				Coalesce(
+					F("total_amount"),
+					ExpressionWrapper(
+						F("total_work_hours") * F("rate"),
+						output_field=DecimalField(max_digits=14, decimal_places=2),
+					),
+				),
+			),
+			Value(Decimal("0.00")),
+		),
 	)["total"]
 
 	today = timezone.localdate()
@@ -1468,9 +1494,11 @@ def _sync_jcb_transactions(jcb_record):
 		category=jcb_income_category,
 	)
 
-	if jcb_record.paid_amount > 0:
+	paid_amount = Decimal(str(jcb_record.paid_amount or Decimal("0.00"))).quantize(Decimal("0.01"))
+
+	if paid_amount > 0:
 		income_txn = income_qs.order_by("created_at").first()
-		income_amount = jcb_record.paid_amount.quantize(Decimal("0.01"))
+		income_amount = paid_amount
 		if income_txn:
 			income_txn.date = jcb_record.date
 			income_txn.amount = income_amount
@@ -1649,18 +1677,18 @@ def _customer_payment_context(customer, request):
 	pending_material_total = sum((row["pending_amount"] for row in pending_material_rows), Decimal("0.00"))
 	pending_jcb_rows = []
 	for record in customer.jcb_records.filter(pending_amount__gt=0).order_by("date", "created_at", "id"):
-		pending_amount = Decimal(str(record.pending_amount or Decimal("0.00"))).quantize(Decimal("0.01"))
-		if pending_amount <= 0:
+		total = Decimal(str(record.income_amount or Decimal("0.00"))).quantize(Decimal("0.01"))
+		paid = Decimal(str(record.paid_amount or Decimal("0.00"))).quantize(Decimal("0.01"))
+		pending = Decimal(str(record.pending_amount or Decimal("0.00"))).quantize(Decimal("0.01"))
+		if pending <= 0:
 			continue
-		total = record.total_amount
-		if total in (None, ""):
-			total = (record.total_work_hours or Decimal("0.00")) * (record.rate or Decimal("0.00"))
-		total = Decimal(str(total or Decimal("0.00"))).quantize(Decimal("0.01"))
 		pending_jcb_rows.append(
 			{
 				"label": "JCB",
 				"record": record,
-				"pending_amount": pending_amount,
+				"pending_amount": pending,
+				"paid_amount": paid,
+				"total_amount": total,
 				"descriptor": f"{record.site_name or 'JCB work'} | {record.total_work_hours} hrs @ NPR {record.rate}",
 			}
 		)
@@ -1718,8 +1746,8 @@ def _customer_payment_context(customer, request):
 				"reference": f"#{record.id}",
 				"date": record.date,
 				"details": row["descriptor"],
-				"total": record.total_amount or Decimal("0.00"),
-				"paid": record.paid_amount or Decimal("0.00"),
+				"total": row["total_amount"],
+				"paid": row["paid_amount"],
 				"due": row["pending_amount"],
 				"status": record.get_status_display(),
 				"sale_id": None,
@@ -2264,8 +2292,8 @@ def jcb_record_mark_paid(request, pk):
 		messages.info(request, "JCB record is already marked as paid.")
 		return _redirect_to_next_or_default(request, "jcb_records")
 
-	jcb_record.paid_amount = jcb_record.total_amount or jcb_record.income_amount
-	jcb_record.save()
+	jcb_record.paid_amount = jcb_record.income_amount
+	jcb_record.save(update_fields=["paid_amount", "status", "pending_amount", "updated_at"])
 	_sync_jcb_transactions(jcb_record)
 
 	messages.success(request, f"JCB record on {jcb_record.date} marked as paid.")

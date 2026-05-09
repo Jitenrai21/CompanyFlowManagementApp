@@ -14,10 +14,10 @@
                     <th>End</th>
                     <th>Work Hours</th>
                     <th>Total Amount</th>
-                    <th>Status</th>
-                    <th>Rate</th>
                     <th>Paid</th>
                     <th>Pending</th>
+                    <th>Payment Status</th>
+                    <th>Rate</th>
                     <th>Expense</th>
                     <th>Customer</th>
                     <th class="text-right whitespace-nowrap">Actions</th>
@@ -109,18 +109,16 @@
                     <td>{{ record.end_time }}</td>
                     <td>{{ record.total_work_hours }}</td>
                     <td>NPR {{ record.total_amount|default:record.income_amount_calc|default:record.income_amount|npr_amount }}</td>
+                    <td>NPR {{ record.paid_amount|npr_amount }}</td>
+                    <td>
+                        <span class="{% if record.pending_amount > 0 %}text-error{% else %}text-success{% endif %}">NPR {{ record.pending_amount|npr_amount }}</span>
+                    </td>
                     <td>
                         <span class="badge {% if record.status == 'paid' %}badge-success{% else %}badge-warning{% endif %} badge-outline">
                             {{ record.get_status_display }}
                         </span>
                     </td>
                     <td>NPR {{ record.rate|npr_amount }}</td>
-                    <td>NPR {{ record.paid_amount|npr_amount }}</td>
-                    <td>
-                        <span class="badge badge-sm badge-outline whitespace-nowrap {% if record.pending_amount > 0 %}badge-warning{% else %}badge-success{% endif %}">
-                            NPR {{ record.pending_amount|npr_amount }}
-                        </span>
-                    </td>
                     <td>
                         {% if record.expense_item and record.expense_amount %}
                         {{ record.expense_item }} (NPR {{ record.expense_amount|npr_amount }})
@@ -141,7 +139,7 @@
                                 <a href="{% url 'jcb_record_edit' record.id %}" class="btn btn-xs btn-square btn-outline" title="Edit record" aria-label="Edit JCB record {{ record.id }}">
                                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-3.5 w-3.5" aria-hidden="true"><path d="M13.586 2.586a2 2 0 112.828 2.828l-8.9 8.9a1 1 0 01-.424.26l-3 1a1 1 0 01-1.264-1.264l1-3a1 1 0 01.26-.424l8.9-8.9z" /></svg>
                                 </a>
-                                {% if record.pending_amount > 0 and record.total_amount > 0 %}
+                                {% if record.pending_amount > 0 %}
                                 <form method="post" action="{% url 'jcb_record_mark_paid' record.id %}" class="inline" onsubmit="return confirm('Mark this JCB record as paid?');">
                                     {% csrf_token %}
                                     <input type="hidden" name="next" value="{{ request.get_full_path }}">
@@ -169,7 +167,7 @@
                                 <div tabindex="0" class="dropdown-content z-[1] mt-2 w-44 rounded-box border border-base-300 bg-base-100 p-2 shadow">
                                     <div class="flex flex-col gap-1">
                                         <a href="{% url 'jcb_record_edit' record.id %}" class="btn btn-xs btn-ghost justify-start">Edit</a>
-                                        {% if record.pending_amount > 0 and record.total_amount > 0 %}
+                                        {% if record.pending_amount > 0 %}
                                         <form method="post" action="{% url 'jcb_record_mark_paid' record.id %}" onsubmit="return confirm('Mark this JCB record as paid?');">
                                             {% csrf_token %}
                                             <input type="hidden" name="next" value="{{ request.get_full_path }}">

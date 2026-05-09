@@ -508,6 +508,11 @@ class JCBRecordForm(forms.ModelForm):
         if total_amount is not None and total_amount < 0:
             self.add_error("total_amount", "Total amount cannot be negative.")
 
+        if paid_amount in (None, ""):
+            paid_amount = Decimal("0.00")
+        if paid_amount < 0:
+            self.add_error("paid_amount", "Paid amount cannot be negative.")
+
         if rate in (None, ""):
             cleaned_data["rate"] = Decimal("2000.00")
             rate = cleaned_data["rate"]
@@ -521,18 +526,13 @@ class JCBRecordForm(forms.ModelForm):
                 cleaned_data["total_amount"] = (worked * rate).quantize(Decimal("0.01"))
 
         total_amount = cleaned_data.get("total_amount")
-        paid_amount = paid_amount or Decimal("0.00")
-        if total_amount not in (None, "") and status == RecordStatus.PAID and paid_amount == Decimal("0.00"):
+        if status == RecordStatus.PAID and total_amount not in (None, "") and total_amount > 0 and paid_amount <= 0:
             paid_amount = total_amount
-        if paid_amount < 0:
-            self.add_error("paid_amount", "Paid amount cannot be negative.")
-        elif total_amount not in (None, "") and paid_amount > total_amount:
-            self.add_error("paid_amount", "Paid amount cannot exceed total amount.")
-        else:
-            cleaned_data["paid_amount"] = paid_amount
 
-        if total_amount not in (None, ""):
-            cleaned_data["status"] = RecordStatus.PAID if total_amount > 0 and cleaned_data.get("paid_amount", Decimal("0.00")) >= total_amount else RecordStatus.PENDING
+        if total_amount not in (None, "") and total_amount >= 0 and paid_amount > total_amount:
+            self.add_error("paid_amount", "Paid amount cannot exceed total amount.")
+
+        cleaned_data["paid_amount"] = Decimal(str(paid_amount or Decimal("0.00"))).quantize(Decimal("0.01"))
 
         cleaned_data["expense_item"] = expense_item
         return _normalize_form_date_fields(self, cleaned_data, ("date",))
@@ -550,6 +550,7 @@ class JCBRecordForm(forms.ModelForm):
         self.fields["rate"].required = False
         self.fields["status"].required = False
         self.fields["total_amount"].required = False
+        self.fields["paid_amount"].required = False
         if self.instance and self.instance.pk and self.instance.customer:
             self.initial["customer_input"] = self.instance.customer.name
         if self.instance and self.instance.pk and self.instance.total_amount is None:
