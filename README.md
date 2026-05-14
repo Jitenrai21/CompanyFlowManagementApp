@@ -34,41 +34,6 @@ Company Flow Management App provides day-to-day operational tracking for busines
 
 The app favors pragmatic UX (partial updates via HTMX, compact item entry tables) and stores flexible sale item lines in a JSONField to avoid frequent migrations while allowing schema changes in validation and UI.
 
-## Recent enhancements (May 2026)
-
-- Added optional `unit` per sale item (dropdown choices include "Nissan", "Tipper", "Bora", "Pieces"). Existing legacy sale item lines remain valid and keep a blank unit when not present.
-- Sales export extended with item-level columns: Items, Quantity Sold, Units Seen, and Item Lines (CSV/PDF exports now include useful per-item summaries).
-- Sales item entry UI improvements: horizontally-scrollable table on narrow screens, reduced item column width, swapped Unit and Qty columns, and Add Item auto-focuses the new row's Item field.
-- Form UX: `due_date` in blocks/cement/bamboo forms defaults to today's date on new forms (client-side fallback) to reduce accidental empty due-dates.
-- Material sale detail pages (blocks/cement/bamboo) now include an itemized-style sale breakdown table for parity with core sales detail UX.
-- JCB records now support optional customer assignment (type/select customer, create-on-miss behavior), with customer visibility in JCB list views.
-- JCB customer workflow improvements: pending JCB amounts are now included in customer due and pending payment context, so assigned JCB work is visible in customer profile dues.
-- JCB list filtering now supports customer and unassigned records for faster reconciliation.
-- Customer payment summary messaging was improved to reflect allocations more accurately, including material allocation visibility in payment breakdown context.
-- Navbar/topbar responsive tweaks to avoid action compression on smaller screens and to hide brand text under narrow viewports.
-
-Files touched by these changes (quick links):
-
-- [templates/core/sale_form.html](templates/core/sale_form.html)
-- [templates/core/sale_detail.html](templates/core/sale_detail.html)
-- [templates/core/partials/sales_table.html](templates/core/partials/sales_table.html)
-- [templates/base.html](templates/base.html)
-- [core/forms.py](core/forms.py)
-- [core/report_exports.py](core/report_exports.py)
-- [templates/core/blocks_record_form.html](templates/core/blocks_record_form.html)
-- [templates/core/cement_record_form.html](templates/core/cement_record_form.html)
-- [templates/core/bamboo_record_form.html](templates/core/bamboo_record_form.html)
-- [templates/core/material_record_detail.html](templates/core/material_record_detail.html)
-- [templates/core/jcb_record_form.html](templates/core/jcb_record_form.html)
-- [templates/core/jcb_records.html](templates/core/jcb_records.html)
-- [templates/core/partials/jcb_records_table.html](templates/core/partials/jcb_records_table.html)
-- [core/views.py](core/views.py)
-
-Notes:
-- No database migration was required because sale item lines continue to live in `Sale.items` (a JSONField). Validation and front-end payloads were updated instead.
-- Form validation accepts blank `unit` for legacy entries and rejects unknown unit values.
-- Optional customer assignment for JCB records uses nullable foreign key behavior and remains backward-compatible with legacy unassigned records.
-
 ---
 
 ## Features and modules (detailed)
