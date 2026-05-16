@@ -1537,7 +1537,7 @@ def _auto_apply_customer_credit_to_jcb(record, payment_date=None):
 
 		record.paid_amount = (record.paid_amount or Decimal("0.00")) + applied_amount
 		record.save(update_fields=["paid_amount", "pending_amount", "status", "updated_at"])
-		_sync_jcb_transactions(record)
+		_sync_jcb_transactions(record, payment_date=payment_date)
 		return applied_amount
 
 
@@ -1674,7 +1674,7 @@ def _create_material_allocation_transaction(
 	return transaction_obj
 
 
-def _sync_jcb_transactions(jcb_record):
+def _sync_jcb_transactions(jcb_record, *, payment_date=None):
 	jcb_income_category = _get_or_create_predefined_category(JCB_INCOME_CATEGORY)
 	jcb_expense_category = _get_or_create_predefined_category(JCB_EXPENSE_CATEGORY)
 	income_description = f"JCB work on {jcb_record.date} ({jcb_record.total_work_hours} hrs)"
@@ -1701,10 +1701,11 @@ def _sync_jcb_transactions(jcb_record):
 	auto_income_amount = auto_income_amount.quantize(Decimal("0.01"))
 
 	if auto_income_amount > 0:
+		income_date = payment_date or jcb_record.date
 		income_txn = income_qs.order_by("created_at").first()
 		income_amount = auto_income_amount
 		if income_txn:
-			income_txn.date = jcb_record.date
+			income_txn.date = income_date
 			income_txn.amount = income_amount
 			income_txn.payment_method = PaymentMethod.CASH
 			income_txn.description = income_description
@@ -1722,7 +1723,7 @@ def _sync_jcb_transactions(jcb_record):
 			income_qs.exclude(pk=income_txn.pk).delete()
 		else:
 			Transaction.objects.create(
-				date=jcb_record.date,
+				date=income_date,
 				amount=income_amount,
 				type=TransactionType.INCOME,
 				payment_method=PaymentMethod.CASH,
@@ -2542,7 +2543,7 @@ def jcb_record_mark_paid(request, pk):
 
 	jcb_record.paid_amount = jcb_record.income_amount
 	jcb_record.save(update_fields=["paid_amount", "status", "pending_amount", "updated_at"])
-	_sync_jcb_transactions(jcb_record)
+	_sync_jcb_transactions(jcb_record, payment_date=timezone.localdate())
 
 	messages.success(request, f"JCB record on {jcb_record.date} marked as paid.")
 	return _redirect_to_next_or_default(request, "jcb_records")
@@ -3309,7 +3310,7 @@ def customer_allocate_payment(request, pk):
 					)
 					record.paid_amount = (record.paid_amount or Decimal("0.00")) + allocation_amount
 					record.save(update_fields=["paid_amount", "pending_amount", "status", "updated_at"])
-					_sync_jcb_transactions(record)
+					_sync_jcb_transactions(record, payment_date=payment_date)
 					record.refresh_from_db(fields=["status", "pending_amount"])
 					if record.status == RecordStatus.PAID:
 						fully_paid_count += 1
