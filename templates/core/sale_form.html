@@ -167,7 +167,7 @@
                     <input type="text" list="sale-item-options" class="input input-bordered input-sm w-full" data-item-name placeholder="Item name">
                 </td>
                 <td>
-                    <input type="number" min="1" step="1" inputmode="numeric" class="input input-bordered input-sm w-full text-right" data-item-quantity placeholder="1" value="1">
+                    <input type="number" min="0.5" step="0.5" inputmode="decimal" class="input input-bordered input-sm w-full text-right" data-item-quantity placeholder="1" value="1">
                 </td>
                 <td>
                     <select class="select select-bordered select-sm w-full" data-item-unit>
@@ -202,7 +202,7 @@
             const quantityInput = row.querySelector('[data-item-quantity]');
             const priceInput = row.querySelector('[data-item-price]');
             const amountInput = row.querySelector('[data-item-amount]');
-            const quantity = Math.trunc(parseNumber(quantityInput.value, 0));
+            const quantity = parseNumber(quantityInput.value, 0);
             const price = parseNumber(priceInput.value, 0);
             const safeQuantity = quantity > 0 ? quantity : 0;
             const safePrice = price >= 0 ? price : 0;
@@ -216,7 +216,7 @@
                 .map((row) => {
                     const name = row.querySelector('[data-item-name]').value.trim();
                     const unitValue = (row.querySelector('[data-item-unit]').value || '').trim();
-                    const quantityValue = Math.trunc(parseNumber(row.querySelector('[data-item-quantity]').value, 1));
+                    const quantityValue = parseNumber(row.querySelector('[data-item-quantity]').value, 1);
                     const priceValue = parseNumber(row.querySelector('[data-item-price]').value, 0);
                     const safeQuantity = quantityValue > 0 ? quantityValue : 1;
                     const safePrice = priceValue >= 0 ? priceValue : 0;
