@@ -713,6 +713,9 @@ def _dashboard_context(request=None, date_from="", date_to=""):
 	blocks_queryset = BlocksRecord.objects.all()
 	cement_queryset = CementRecord.objects.all()
 	bamboo_queryset = BambooRecord.objects.all()
+	all_time_blocks_queryset = BlocksRecord.objects.all()
+	all_time_cement_queryset = CementRecord.objects.all()
+	all_time_bamboo_queryset = BambooRecord.objects.all()
 	if date_from:
 		transactions_queryset = transactions_queryset.filter(date__gte=date_from)
 		jcb_queryset = jcb_queryset.filter(date__gte=date_from)
@@ -975,7 +978,7 @@ def _dashboard_context(request=None, date_from="", date_to=""):
 	net_income = kpi_income_expense["total_income"] - kpi_income_expense["total_expenses"]
 
 	# Blocks Records Summary
-	blocks_summary_raw = blocks_queryset.aggregate(
+	blocks_summary_raw = all_time_blocks_queryset.aggregate(
 		total_investment=Coalesce(Sum("investment"), Value(Decimal("0.00"))),
 		total_sale_income=Coalesce(
 			Sum(
@@ -1035,7 +1038,7 @@ def _dashboard_context(request=None, date_from="", date_to=""):
 	]
 
 	# Cement Records Summary
-	cement_summary_raw = cement_queryset.aggregate(
+	cement_summary_raw = all_time_cement_queryset.aggregate(
 		total_investment=Coalesce(Sum("investment"), Value(Decimal("0.00"))),
 		total_sale_income=Coalesce(
 			Sum(
@@ -1087,7 +1090,7 @@ def _dashboard_context(request=None, date_from="", date_to=""):
 	]
 
 	# Bamboo Records Summary
-	bamboo_summary_raw = bamboo_queryset.aggregate(
+	bamboo_summary_raw = all_time_bamboo_queryset.aggregate(
 		total_investment=Coalesce(Sum("investment"), Value(Decimal("0.00"))),
 		total_sale_income=Coalesce(
 			Sum(
