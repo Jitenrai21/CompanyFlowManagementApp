@@ -795,6 +795,39 @@ class MaterialSalesCreditTests(TestCase):
 		)
 		self.assertEqual(receipt.amount, Decimal("300.00"))
 
+	def test_blocks_sale_delete_restores_credit_balance(self):
+		self.client.login(username="material-user", password="pass1234")
+		self.customer.credit_balance = Decimal("500.00")
+		self.customer.save(update_fields=["credit_balance", "updated_at"])
+
+		create_response = self.client.post(
+			reverse("blocks_record_create"),
+			data={
+				"date": bs_today_date().isoformat(),
+				"record_type": BlocksRecordType.SALE,
+				"customer": str(self.customer.pk),
+				"customer_input": self.customer.name,
+				"unit_type": BlocksUnitType.FOUR_INCH,
+				"quantity": "3",
+				"price_per_unit": "100.00",
+				"paid_amount": "0",
+				"due_date": bs_today_date().isoformat(),
+				"notes": "Delete credit restore",
+			},
+		)
+		self.assertEqual(create_response.status_code, 302)
+
+		record = BlocksRecord.objects.get(record_type=BlocksRecordType.SALE, notes="Delete credit restore")
+		self.customer.refresh_from_db()
+		self.assertEqual(self.customer.credit_balance, Decimal("200.00"))
+
+		delete_response = self.client.post(reverse("blocks_record_delete", args=[record.pk]))
+		self.assertEqual(delete_response.status_code, 302)
+
+		self.customer.refresh_from_db()
+		self.assertEqual(self.customer.credit_balance, Decimal("500.00"))
+		self.assertFalse(BlocksRecord.objects.filter(pk=record.pk).exists())
+
 	def test_cement_sale_create_auto_applies_credit_balance_partially(self):
 		self.client.login(username="material-user", password="pass1234")
 		self.customer.credit_balance = Decimal("250.00")
@@ -1013,6 +1046,40 @@ class JCBRecordCustomerAssignmentTests(TestCase):
 		).first()
 		self.assertIsNotNone(credit_tx)
 		self.assertEqual(credit_tx.amount, Decimal("1200.00"))
+
+	def test_jcb_delete_restores_credit_balance(self):
+		self.client.login(username="jcb-user", password="pass1234")
+		self.customer.credit_balance = Decimal("1200.00")
+		self.customer.save(update_fields=["credit_balance", "updated_at"])
+
+		create_response = self.client.post(
+			reverse("jcb_record_create"),
+			data={
+				"date": bs_today_date().isoformat(),
+				"customer_input": self.customer.name,
+				"site_name": "Delete JCB Credit",
+				"start_time": "1.00",
+				"end_time": "3.00",
+				"status": RecordStatus.PENDING,
+				"rate": "2000.00",
+				"total_amount": "5000.00",
+				"paid_amount": "0.00",
+				"expense_item": "",
+				"expense_amount": "",
+			},
+		)
+		self.assertEqual(create_response.status_code, 302)
+
+		record = JCBRecord.objects.get(site_name="Delete JCB Credit")
+		self.customer.refresh_from_db()
+		self.assertEqual(self.customer.credit_balance, Decimal("0.00"))
+
+		delete_response = self.client.post(reverse("jcb_record_delete", args=[record.pk]))
+		self.assertEqual(delete_response.status_code, 302)
+
+		self.customer.refresh_from_db()
+		self.assertEqual(self.customer.credit_balance, Decimal("1200.00"))
+		self.assertFalse(JCBRecord.objects.filter(pk=record.pk).exists())
 
 	def test_customer_allocate_payment_can_select_jcb_pending_record(self):
 		self.client.login(username="jcb-user", password="pass1234")

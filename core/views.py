@@ -167,6 +167,32 @@ def _get_or_create_predefined_category(name):
 	return category
 
 
+def _apply_customer_balance_delta(*, customer=None, customer_id=None, credit_delta=Decimal("0.00"), manual_due_delta=Decimal("0.00")):
+	if customer is None and not customer_id:
+		return None
+
+	credit_delta = Decimal(str(credit_delta or Decimal("0.00"))).quantize(Decimal("0.01"))
+	manual_due_delta = Decimal(str(manual_due_delta or Decimal("0.00"))).quantize(Decimal("0.01"))
+	if credit_delta == 0 and manual_due_delta == 0:
+		return customer
+
+	def apply_deltas(target_customer):
+		if credit_delta:
+			target_customer.credit_balance = (target_customer.credit_balance + credit_delta).quantize(Decimal("0.01"))
+		if manual_due_delta:
+			new_manual_due = (target_customer.manual_due_amount + manual_due_delta).quantize(Decimal("0.01"))
+			target_customer.manual_due_amount = max(new_manual_due, Decimal("0.00"))
+		target_customer.save(update_fields=["credit_balance", "manual_due_amount", "updated_at"])
+		return target_customer
+
+	if customer is not None:
+		return apply_deltas(customer)
+
+	with db_transaction.atomic():
+		locked_customer = Customer.objects.select_for_update().get(pk=customer_id)
+		return apply_deltas(locked_customer)
+
+
 def _reverse_customer_expense_settlement(customer_id, credit_applied, due_remainder):
 	if not customer_id:
 		return
@@ -176,13 +202,11 @@ def _reverse_customer_expense_settlement(customer_id, credit_applied, due_remain
 	if credit_applied <= 0 and due_remainder <= 0:
 		return
 
-	with db_transaction.atomic():
-		customer = Customer.objects.select_for_update().get(pk=customer_id)
-		if credit_applied > 0:
-			customer.credit_balance = (customer.credit_balance + credit_applied).quantize(Decimal("0.01"))
-		if due_remainder > 0:
-			customer.manual_due_amount = max(customer.manual_due_amount - due_remainder, Decimal("0.00"))
-		customer.save(update_fields=["credit_balance", "manual_due_amount", "updated_at"])
+	_apply_customer_balance_delta(
+		customer_id=customer_id,
+		credit_delta=credit_applied,
+		manual_due_delta=-due_remainder,
+	)
 
 
 def _apply_customer_expense_settlement(transaction_obj):
@@ -206,9 +230,11 @@ def _apply_customer_expense_settlement(transaction_obj):
 		if due_remainder < 0:
 			due_remainder = Decimal("0.00")
 
-		customer.credit_balance = (customer.credit_balance - credit_applied).quantize(Decimal("0.01"))
-		customer.manual_due_amount = (customer.manual_due_amount + due_remainder).quantize(Decimal("0.01"))
-		customer.save(update_fields=["credit_balance", "manual_due_amount", "updated_at"])
+		_apply_customer_balance_delta(
+			customer=customer,
+			credit_delta=-credit_applied,
+			manual_due_delta=due_remainder,
+		)
 
 		transaction_obj.expense_credit_applied = credit_applied
 		transaction_obj.expense_due_remainder = due_remainder
@@ -1407,8 +1433,7 @@ def _auto_allocate_customer_cash_entry(*, customer, payment_date, payment_amount
 				description=topup_description,
 				customer=customer,
 			)
-			customer.credit_balance = customer.credit_balance + remaining_payment
-			customer.save(update_fields=["credit_balance", "updated_at"])
+			_apply_customer_balance_delta(customer=customer, credit_delta=remaining_payment)
 
 		customer_payment.allocated_amount = allocated_total
 		customer_payment.unallocated_amount = remaining_payment
@@ -1452,8 +1477,7 @@ def _auto_apply_customer_credit_to_sale(sale, payment_date=None):
 			sale=sale,
 		)
 
-		customer.credit_balance = customer.credit_balance - applied_amount
-		customer.save(update_fields=["credit_balance", "updated_at"])
+		_apply_customer_balance_delta(customer=customer, credit_delta=-applied_amount)
 
 		_sync_sale_after_receipt_change(sale)
 		return applied_amount
@@ -1496,8 +1520,7 @@ def _auto_apply_customer_credit_to_material(record, payment_date=None):
 			category_name=CREDIT_BALANCE_APPLIED_CATEGORY,
 		)
 
-		customer.credit_balance = customer.credit_balance - applied_amount
-		customer.save(update_fields=["credit_balance", "updated_at"])
+		_apply_customer_balance_delta(customer=customer, credit_delta=-applied_amount)
 
 		_sync_material_sale_payment_fields(record)
 		_reconcile_material_sale_income_transaction(record)
@@ -1532,8 +1555,7 @@ def _auto_apply_customer_credit_to_jcb(record, payment_date=None):
 			jcb_record=record,
 		)
 
-		customer.credit_balance = customer.credit_balance - applied_amount
-		customer.save(update_fields=["credit_balance", "updated_at"])
+		_apply_customer_balance_delta(customer=customer, credit_delta=-applied_amount)
 
 		record.paid_amount = (record.paid_amount or Decimal("0.00")) + applied_amount
 		record.save(update_fields=["paid_amount", "pending_amount", "status", "updated_at"])
@@ -2330,10 +2352,34 @@ def transaction_delete(request, pk):
 		return redirect("finance_ledger")
 
 	linked_sale_id = transaction_obj.sale_id
+	linked_blocks_id = transaction_obj.blocks_record_id
+	linked_cement_id = transaction_obj.cement_record_id
+	linked_bamboo_id = transaction_obj.bamboo_record_id
+	linked_jcb_id = transaction_obj.jcb_record_id
 	entry_label = f"{transaction_obj.get_type_display()} entry on {transaction_obj.date}"
 
 	try:
 		with db_transaction.atomic():
+			category_name = transaction_obj.category.name if transaction_obj.category_id else ""
+			credit_delta = Decimal("0.00")
+			manual_due_delta = Decimal("0.00")
+			if transaction_obj.type == TransactionType.INCOME and transaction_obj.customer_id:
+				if category_name == CREDIT_BALANCE_APPLIED_CATEGORY:
+					credit_delta = transaction_obj.amount
+					if not any([linked_sale_id, linked_blocks_id, linked_cement_id, linked_bamboo_id, linked_jcb_id]):
+						manual_due_delta = transaction_obj.amount
+				elif category_name == CREDIT_TOPUP_CATEGORY:
+					credit_delta = -transaction_obj.amount
+				elif category_name == MANUAL_DUE_SETTLEMENT_CATEGORY:
+					manual_due_delta = transaction_obj.amount
+
+			if credit_delta != 0 or manual_due_delta != 0:
+				_apply_customer_balance_delta(
+					customer_id=transaction_obj.customer_id,
+					credit_delta=credit_delta,
+					manual_due_delta=manual_due_delta,
+				)
+
 			_reverse_customer_expense_settlement(
 				transaction_obj.customer_id if transaction_obj.type == TransactionType.EXPENSE else None,
 				transaction_obj.expense_credit_applied if transaction_obj.type == TransactionType.EXPENSE else Decimal("0.00"),
@@ -2344,6 +2390,30 @@ def transaction_delete(request, pk):
 				linked_sale = Sale.objects.filter(pk=linked_sale_id).first()
 				if linked_sale:
 					_sync_sale_after_receipt_change(linked_sale)
+			if linked_blocks_id:
+				linked_record = BlocksRecord.objects.filter(pk=linked_blocks_id).first()
+				if linked_record:
+					_sync_material_sale_payment_fields(linked_record)
+					_reconcile_material_sale_income_transaction(linked_record)
+			if linked_cement_id:
+				linked_record = CementRecord.objects.filter(pk=linked_cement_id).first()
+				if linked_record:
+					_sync_material_sale_payment_fields(linked_record)
+					_reconcile_material_sale_income_transaction(linked_record)
+			if linked_bamboo_id:
+				linked_record = BambooRecord.objects.filter(pk=linked_bamboo_id).first()
+				if linked_record:
+					_sync_material_sale_payment_fields(linked_record)
+					_reconcile_material_sale_income_transaction(linked_record)
+			if linked_jcb_id:
+				linked_record = JCBRecord.objects.filter(pk=linked_jcb_id).first()
+				if linked_record and transaction_obj.type == TransactionType.INCOME:
+					linked_record.paid_amount = max(
+						Decimal("0.00"),
+						(Decimal(str(linked_record.paid_amount or Decimal("0.00"))) - transaction_obj.amount).quantize(Decimal("0.01")),
+					)
+					linked_record.save(update_fields=["paid_amount", "pending_amount", "status", "updated_at"])
+					_sync_jcb_transactions(linked_record)
 	except Exception:
 		if request.headers.get("HX-Request"):
 			return _htmx_feedback_response(
@@ -2508,6 +2578,22 @@ def jcb_record_delete(request, pk):
 
 	try:
 		with db_transaction.atomic():
+			credit_applied_total = Decimal("0.00")
+			if jcb_record.customer_id:
+				credit_applied_total = (
+					Transaction.objects.filter(
+						jcb_record=jcb_record,
+						type=TransactionType.INCOME,
+						category__name=CREDIT_BALANCE_APPLIED_CATEGORY,
+					)
+					.aggregate(total=Coalesce(Sum("amount"), Value(Decimal("0.00"))))["total"]
+				)
+				if credit_applied_total > 0:
+					_apply_customer_balance_delta(
+						customer_id=jcb_record.customer_id,
+						credit_delta=credit_applied_total,
+					)
+
 			Transaction.objects.filter(jcb_record=jcb_record).delete()
 			jcb_record.delete()
 	except Exception:
@@ -2918,9 +3004,10 @@ def sale_delete(request, pk):
 				)
 
 				if credit_applied_total > 0:
-					customer = Customer.objects.select_for_update().get(pk=sale.customer_id)
-					customer.credit_balance = customer.credit_balance + credit_applied_total
-					customer.save(update_fields=["credit_balance", "updated_at"])
+					_apply_customer_balance_delta(
+						customer_id=sale.customer_id,
+						credit_delta=credit_applied_total,
+					)
 
 			Transaction.objects.filter(sale=sale).delete()
 			sale.delete()
@@ -3365,7 +3452,7 @@ def customer_allocate_payment(request, pk):
 					description=manual_due_description,
 					customer=customer,
 				)
-			customer.manual_due_amount -= allocate_to_manual_due
+			_apply_customer_balance_delta(customer=customer, manual_due_delta=-allocate_to_manual_due)
 			remaining_payment -= allocate_to_manual_due
 			allocated_total += allocate_to_manual_due
 
@@ -3374,9 +3461,8 @@ def customer_allocate_payment(request, pk):
 			customer_payment.unallocated_amount = remaining_payment
 			customer_payment.save(update_fields=["allocated_amount", "unallocated_amount", "updated_at"])
 		elif allocated_total > 0:
-			customer.credit_balance = max(Decimal("0.00"), customer.credit_balance - allocated_total)
-			customer.save(update_fields=["credit_balance", "manual_due_amount", "updated_at"])
-			remaining_payment = customer.credit_balance
+			customer = _apply_customer_balance_delta(customer=customer, credit_delta=-allocated_total)
+			remaining_payment = customer.credit_balance if customer else remaining_payment
 
 		if (not use_credit_balance) and manual_due_to_allocate and customer.manual_due_amount < manual_due_amount_before:
 			customer.save(update_fields=["manual_due_amount", "updated_at"])
@@ -3390,8 +3476,7 @@ def customer_allocate_payment(request, pk):
 				description="Unallocated customer payment added to customer credit balance",
 				customer=customer,
 			)
-			customer.credit_balance = customer.credit_balance + remaining_payment
-			customer.save(update_fields=["credit_balance", "updated_at"])
+			_apply_customer_balance_delta(customer=customer, credit_delta=remaining_payment)
 		elif not use_credit_balance:
 			customer.save()
 
@@ -3774,9 +3859,26 @@ def blocks_record_delete(request, pk):
 	if request.method != "POST":
 		return redirect("blocks_records")
 
-	# Only sale-income transactions are managed by the blocks module.
-	blocks_record.transactions.filter(type=TransactionType.INCOME).delete()
-	blocks_record.delete()
+	with db_transaction.atomic():
+		credit_applied_total = Decimal("0.00")
+		if blocks_record.customer_id:
+			credit_applied_total = (
+				Transaction.objects.filter(
+					blocks_record=blocks_record,
+					type=TransactionType.INCOME,
+					category__name=CREDIT_BALANCE_APPLIED_CATEGORY,
+				)
+				.aggregate(total=Coalesce(Sum("amount"), Value(Decimal("0.00"))))["total"]
+			)
+			if credit_applied_total > 0:
+				_apply_customer_balance_delta(
+					customer_id=blocks_record.customer_id,
+					credit_delta=credit_applied_total,
+				)
+
+		# Only sale-income transactions are managed by the blocks module.
+		blocks_record.transactions.filter(type=TransactionType.INCOME).delete()
+		blocks_record.delete()
 	messages.success(request, "Blocks record deleted successfully.")
 	return redirect("blocks_records")
 
@@ -3973,8 +4075,25 @@ def cement_record_delete(request, pk):
 	if request.method != "POST":
 		return redirect("cement_records")
 
-	cement_record.transactions.filter(type=TransactionType.INCOME).delete()
-	cement_record.delete()
+	with db_transaction.atomic():
+		credit_applied_total = Decimal("0.00")
+		if cement_record.customer_id:
+			credit_applied_total = (
+				Transaction.objects.filter(
+					cement_record=cement_record,
+					type=TransactionType.INCOME,
+					category__name=CREDIT_BALANCE_APPLIED_CATEGORY,
+				)
+				.aggregate(total=Coalesce(Sum("amount"), Value(Decimal("0.00"))))["total"]
+			)
+			if credit_applied_total > 0:
+				_apply_customer_balance_delta(
+					customer_id=cement_record.customer_id,
+					credit_delta=credit_applied_total,
+				)
+
+		cement_record.transactions.filter(type=TransactionType.INCOME).delete()
+		cement_record.delete()
 	messages.success(request, "Cement record deleted successfully.")
 	return redirect("cement_records")
 
@@ -4166,8 +4285,25 @@ def bamboo_record_delete(request, pk):
 	if request.method != "POST":
 		return redirect("bamboo_records")
 
-	bamboo_record.transactions.filter(type=TransactionType.INCOME).delete()
-	bamboo_record.delete()
+	with db_transaction.atomic():
+		credit_applied_total = Decimal("0.00")
+		if bamboo_record.customer_id:
+			credit_applied_total = (
+				Transaction.objects.filter(
+					bamboo_record=bamboo_record,
+					type=TransactionType.INCOME,
+					category__name=CREDIT_BALANCE_APPLIED_CATEGORY,
+				)
+				.aggregate(total=Coalesce(Sum("amount"), Value(Decimal("0.00"))))["total"]
+			)
+			if credit_applied_total > 0:
+				_apply_customer_balance_delta(
+					customer_id=bamboo_record.customer_id,
+					credit_delta=credit_applied_total,
+				)
+
+		bamboo_record.transactions.filter(type=TransactionType.INCOME).delete()
+		bamboo_record.delete()
 	messages.success(request, "Bamboo record deleted successfully.")
 	return redirect("bamboo_records")
 
