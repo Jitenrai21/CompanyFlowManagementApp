@@ -1,0 +1,26 @@
+<!-- Run this once in your browser console, then save the output -->
+<script>
+  const img = new Image();
+  img.crossOrigin = 'anonymous';
+  img.src = '/static/core/CompanyLogoTitle.jpeg';
+  img.onload = () => {
+    const size = 64;
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
+
+    // Circular clip
+    ctx.beginPath();
+    ctx.arc(size / 2, size / 2, size / 2, 0, Math.PI * 2);
+    ctx.clip();
+
+    ctx.drawImage(img, 0, 0, size, size);
+
+    // Download as PNG
+    const a = document.createElement('a');
+    a.download = 'favicon.png';
+    a.href = canvas.toDataURL('image/png');
+    a.click();
+  };
+</script>
