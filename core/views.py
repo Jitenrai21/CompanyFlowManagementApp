@@ -350,6 +350,25 @@ def _dashboard_module_sales_queryset(model, sale_record_type, date_from="", date
 	return queryset
 
 
+def _dashboard_recognized_income_queryset(date_from="", date_to=""):
+	"""Return income rows for the dashboard income category pie chart.
+
+	Keep traditional finance-ledger income categories visible, but exclude
+	internal customer-credit movement categories that distort category mix.
+	"""
+	queryset = Transaction.objects.select_related("customer").filter(type=TransactionType.INCOME)
+	if date_from:
+		queryset = queryset.filter(date__gte=date_from)
+	if date_to:
+		queryset = queryset.filter(date__lte=date_to)
+	return queryset.exclude(
+		category__name__in=[
+			CREDIT_TOPUP_CATEGORY,
+			CREDIT_BALANCE_APPLIED_CATEGORY,
+		]
+	)
+
+
 def _dashboard_combined_sales_total(date_from="", date_to=""):
 	direct_total = _dashboard_sales_amount_queryset(date_from, date_to).aggregate(
 		total=Coalesce(Sum("total_amount"), Value(Decimal("0.00")))
@@ -948,9 +967,11 @@ def _dashboard_context(request=None, date_from="", date_to=""):
 	category_expense_labels = [row["category__name"] or "Uncategorized" for row in expense_by_category]
 	category_expense_values = [float(row["total"]) for row in expense_by_category]
 
-	# Category breakdown for income (for pie chart)
+	# Category breakdown for recognized income (for pie chart).
+	# This keeps customer credit top-ups out of the chart while allowing
+	# Sales Payment Allocation and Credit Balance Applied to appear.
 	income_by_category = (
-		transactions_queryset.filter(type=TransactionType.INCOME)
+		_dashboard_recognized_income_queryset(date_from, date_to)
 		.values("category__name")
 		.annotate(total=Coalesce(Sum("amount"), Value(Decimal("0.00"))))
 		.order_by("-total")

@@ -1397,6 +1397,54 @@ class CustomerDueCreditBehaviorTests(TestCase):
 		self.assertEqual(response.status_code, 200)
 		self.assertEqual(response.context["kpis"]["total_income"], Decimal("200.00"))
 
+	def test_dashboard_income_pie_keeps_legacy_categories_but_excludes_internal_credit_moves(self):
+		self.client.login(username="customer-due", password="pass1234")
+		recognized_payment = TransactionCategory.objects.create(name="Sales Payment Allocation", is_predefined=True)
+		legacy_income = TransactionCategory.objects.create(name="Sales Receipt", is_predefined=False)
+		recognized_credit = TransactionCategory.objects.create(name="Credit Balance Applied", is_predefined=True)
+		credit_topup = TransactionCategory.objects.create(name="Customer Credit Top-up", is_predefined=True)
+
+		Transaction.objects.create(
+			customer=self.customer,
+			date=bs_today_date(),
+			amount=Decimal("125.00"),
+			type=TransactionType.INCOME,
+			category=recognized_payment,
+		)
+		Transaction.objects.create(
+			customer=self.customer,
+			date=bs_today_date(),
+			amount=Decimal("50.00"),
+			type=TransactionType.INCOME,
+			category=legacy_income,
+		)
+		Transaction.objects.create(
+			customer=self.customer,
+			date=bs_today_date(),
+			amount=Decimal("275.00"),
+			type=TransactionType.INCOME,
+			category=recognized_credit,
+		)
+		Transaction.objects.create(
+			customer=self.customer,
+			date=bs_today_date(),
+			amount=Decimal("999.00"),
+			type=TransactionType.INCOME,
+			category=credit_topup,
+		)
+
+		response = self.client.get(reverse("dashboard"))
+		self.assertEqual(response.status_code, 200)
+
+		labels = response.context["category_income_labels"]
+		values = response.context["category_income_values"]
+		self.assertIn("Sales Payment Allocation", labels)
+		self.assertIn("Sales Receipt", labels)
+		self.assertNotIn("Credit Balance Applied", labels)
+		self.assertNotIn("Customer Credit Top-up", labels)
+		self.assertIn(125.0, values)
+		self.assertIn(50.0, values)
+
 	def test_unassigned_sale_appears_in_alerts_and_timeline(self):
 		self.client.login(username="alert-user", password="pass1234")
 		today = bs_today_date()
