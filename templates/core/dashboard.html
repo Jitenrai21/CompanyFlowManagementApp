@@ -5,34 +5,79 @@
 {% block content %}
 <div class="space-y-6">
     <div class="cf-page-header">
-        <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-                <h1 class="text-3xl font-extrabold tracking-tight">Dashboard</h1>
-                <p class="cf-page-subtitle">KPI overview, trends, and recent activity in one place.</p>
-            </div>
-            <form
-                id="dashboard-filter-form"
-                class="grid grid-cols-1 gap-2 sm:grid-cols-3 lg:grid-cols-[9rem_9rem_auto] lg:items-end"
-                hx-get="{% url 'dashboard' %}"
-                hx-target="#dashboard-content"
-                hx-trigger="change delay:300ms, submit"
-                hx-indicator="#dashboard-loading"
-                hx-push-url="true"
-            >
-                <label class="form-control min-w-0 lg:w-36">
-                    <span class="label-text text-xs">From</span>
-                    <input type="{% if calendar_mode_is_bs %}text{% else %}date{% endif %}" name="date_from" value="{{ filters.date_from|default:'' }}" class="input input-bordered input-sm w-full min-w-0 lg:w-36" aria-label="Filter from date" placeholder="{% if calendar_mode_is_bs %}YYYY-MM-DD (BS){% endif %}" title="Date format: {% if calendar_mode_is_bs %}BS{% else %}AD{% endif %}" />
-                </label>
-                <label class="form-control min-w-0 lg:w-36">
-                    <span class="label-text text-xs">To</span>
-                    <input type="{% if calendar_mode_is_bs %}text{% else %}date{% endif %}" name="date_to" value="{{ filters.date_to|default:'' }}" class="input input-bordered input-sm w-full min-w-0 lg:w-36" aria-label="Filter to date" placeholder="{% if calendar_mode_is_bs %}YYYY-MM-DD (BS){% endif %}" title="Date format: {% if calendar_mode_is_bs %}BS{% else %}AD{% endif %}" />
-                </label>
-                <div class="flex items-end min-w-0">
-                    <div class="grid w-full grid-cols-2 gap-2 lg:w-auto lg:flex-none">
-                        <button type="submit" class="btn btn-primary btn-sm">Apply</button>
-                        <a href="{% url 'dashboard' %}" class="btn btn-outline btn-sm">Reset</a>
-                    </div>
+    <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between lg:flex-nowrap">
+        <div class="shrink-0">
+            <h1 class="text-3xl font-extrabold tracking-tight">Dashboard</h1>
+            <p class="cf-page-subtitle whitespace-nowrap">KPI overview, trends, and recent activity in one place.</p>
+        </div>
+
+        <form
+            id="dashboard-filter-form"
+            class="card bg-base-200/50 border border-base-300 p-3 min-w-0"
+            hx-get="{% url 'dashboard' %}"
+            hx-target="#dashboard-content"
+            hx-swap="innerHTML scroll:false"
+            hx-trigger="change delay:300ms, submit"
+            hx-indicator="#dashboard-loading"
+            hx-push-url="true"
+        >
+            <!-- Row 1: date range + actions -->
+            <div class="flex flex-wrap items-center gap-3">
+                <div class="flex items-center gap-1">
+                    <label class="form-control w-36">
+                        <input
+                            type="{% if calendar_mode_is_bs %}text{% else %}date{% endif %}"
+                            name="date_from"
+                            value="{{ filters.date_from|default:'' }}"
+                            class="input input-bordered input-sm w-full js-date-from [&::-webkit-calendar-picker-indicator]:ml-auto"
+                            aria-label="Filter from date"
+                            placeholder="{% if calendar_mode_is_bs %}YYYY-MM-DD (BS){% endif %}"
+                            title="Date format: {% if calendar_mode_is_bs %}BS{% else %}AD{% endif %}"
+                        />
+                    </label>
+                    <span class="text-[10px] text-base-content/30 mx-0.5">—</span>
+                    <label class="form-control w-36">
+                        <input
+                            type="{% if calendar_mode_is_bs %}text{% else %}date{% endif %}"
+                            name="date_to"
+                            value="{{ filters.date_to|default:'' }}"
+                            class="input input-bordered input-sm w-full js-date-to [&::-webkit-calendar-picker-indicator]:ml-auto"
+                            aria-label="Filter to date"
+                            placeholder="{% if calendar_mode_is_bs %}YYYY-MM-DD (BS){% endif %}"
+                            title="Date format: {% if calendar_mode_is_bs %}BS{% else %}AD{% endif %}"
+                        />
+                    </label>
                 </div>
+
+                <div class="flex items-center gap-1 ml-auto">
+                    <button type="submit" class="btn btn-primary btn-sm">Apply</button>
+                    <a href="{% url 'dashboard' %}" class="btn btn-outline btn-sm">Reset</a>
+                </div>
+            </div>
+
+            <!-- Row 2: presets + helper text -->
+            <div class="flex flex-wrap items-center gap-2 mt-2">
+                <fieldset class="join">
+                    <legend class="sr-only">Preset range</legend>
+                    <button type="button" class="btn btn-ghost btn-xs join-item js-preset-btn" data-days="7">7d</button>
+                    <button type="button" class="btn btn-ghost btn-xs join-item js-preset-btn" data-days="30">30d</button>
+                    <button type="button" class="btn btn-ghost btn-xs join-item js-preset-btn" data-days="90">90d</button>
+                    <button type="button" class="btn btn-ghost btn-xs join-item js-preset-btn" data-days="365">1y</button>
+                    <button type="button" class="btn btn-ghost btn-xs join-item js-preset-btn" data-days="all">All</button>
+                </fieldset>
+                <span class="text-[10px] italic leading-tight" style="color: var(--cf-ink-soft)">Click a preset to auto-fill the date range above</span>
+            </div>
+            
+                <input type="hidden" name="tipper_from" id="hf_tipper_from" value="{{ filters.tipper_from|default:'' }}">
+                <input type="hidden" name="tipper_to" id="hf_tipper_to" value="{{ filters.tipper_to|default:'' }}">
+                <input type="hidden" name="jcb_from" id="hf_jcb_from" value="{{ filters.jcb_from|default:'' }}">
+                <input type="hidden" name="jcb_to" id="hf_jcb_to" value="{{ filters.jcb_to|default:'' }}">
+                <input type="hidden" name="blocks_from" id="hf_blocks_from" value="{{ filters.blocks_from|default:'' }}">
+                <input type="hidden" name="blocks_to" id="hf_blocks_to" value="{{ filters.blocks_to|default:'' }}">
+                <input type="hidden" name="cement_from" id="hf_cement_from" value="{{ filters.cement_from|default:'' }}">
+                <input type="hidden" name="cement_to" id="hf_cement_to" value="{{ filters.cement_to|default:'' }}">
+                <input type="hidden" name="bamboo_from" id="hf_bamboo_from" value="{{ filters.bamboo_from|default:'' }}">
+                <input type="hidden" name="bamboo_to" id="hf_bamboo_to" value="{{ filters.bamboo_to|default:'' }}">
             </form>
         </div>
     </div>
@@ -1110,7 +1155,59 @@
         applyKpiLabelAccessibility(dashboardRoot);
     }
 
-    document.addEventListener('DOMContentLoaded', initDashboardCharts);
+    function initChartFilterControls() {
+        document.querySelectorAll('.js-preset-btn').forEach((btn) => {
+            btn.removeEventListener('click', btn._handler);
+            btn._handler = function (e) {
+                e.preventDefault();
+                const days = this.dataset.days;
+                const fromInput = document.querySelector('.js-date-from');
+                const toInput = document.querySelector('.js-date-to');
+                if (days === 'all') {
+                    fromInput.value = '';
+                    toInput.value = '';
+                } else {
+                    const today = new Date();
+                    const fromDate = new Date(today);
+                    fromDate.setDate(today.getDate() - parseInt(days, 10));
+                    const fmt = (d) => d.toISOString().split('T')[0];
+                    fromInput.value = fmt(fromDate);
+                    toInput.value = fmt(today);
+                }
+                document.getElementById('dashboard-filter-form').requestSubmit();
+            };
+            btn.addEventListener('click', btn._handler);
+        });
+
+        document.querySelectorAll('.js-chart-preset').forEach((btn) => {
+            btn.removeEventListener('click', btn._presetHandler);
+            btn._presetHandler = function (e) {
+                e.preventDefault();
+                const chart = this.dataset.chart;
+                const days = this.dataset.days;
+                const fromHidden = document.getElementById('hf_' + chart + '_from');
+                const toHidden = document.getElementById('hf_' + chart + '_to');
+                if (days === 'all') {
+                    fromHidden.value = '__all__';
+                    toHidden.value = '__all__';
+                } else {
+                    const today = new Date();
+                    const fromDate = new Date(today);
+                    fromDate.setDate(today.getDate() - parseInt(days, 10));
+                    const fmt = (d) => d.toISOString().split('T')[0];
+                    fromHidden.value = fmt(fromDate);
+                    toHidden.value = fmt(today);
+                }
+                document.getElementById('dashboard-filter-form').requestSubmit();
+            };
+            btn.addEventListener('click', btn._presetHandler);
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        initDashboardCharts();
+        initChartFilterControls();
+    });
     window.addEventListener('resize', () => {
         const nextViewportMode = getDashboardViewportMode();
         if (dashboardViewportMode !== nextViewportMode) {
@@ -1126,7 +1223,9 @@
     document.body.addEventListener('htmx:afterSwap', (event) => {
         if (event.target && event.target.id === 'dashboard-content') {
             initDashboardCharts();
+            initChartFilterControls();
         }
     });
+    initChartFilterControls();
 </script>
 {% endblock %}

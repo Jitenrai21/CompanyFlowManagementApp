@@ -2,6 +2,7 @@ import json
 import logging
 from decimal import Decimal
 from datetime import timedelta
+from urllib.parse import urlencode, urlparse, parse_qs, urlunparse
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -310,7 +311,20 @@ def set_calendar_mode(request, mode):
 	request.session[CALENDAR_MODE_SESSION_KEY] = normalize_calendar_mode(mode)
 
 	if next_url and url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}):
-		return redirect(next_url)
+		# Strip date-related query params so they aren't misinterpreted
+		# in the new calendar mode. The dashboard will use its default range.
+		parsed = urlparse(next_url)
+		query = parse_qs(parsed.query, keep_blank_values=True)
+		date_params = {"date_from", "date_to", "bs_date_from", "bs_date_to",
+					   "tipper_from", "tipper_to", "jcb_from", "jcb_to",
+					   "blocks_from", "blocks_to", "cement_from", "cement_to",
+					   "bamboo_from", "bamboo_to"}
+		for key in date_params:
+			query.pop(key, None)
+		clean_query = urlencode(query, doseq=True)
+		clean_url = urlunparse((parsed.scheme, parsed.netloc, parsed.path,
+								parsed.params, clean_query, parsed.fragment))
+		return redirect(clean_url)
 	return redirect("dashboard")
 
 
@@ -721,34 +735,63 @@ def _alerts_context(alert_type="", customer_id="", date_from="", date_to=""):
 	}
 
 
-def _dashboard_context(request=None, date_from="", date_to=""):
+def _dashboard_context(
+	request=None,
+	date_from="", date_to="",
+	tipper_from="", tipper_to="",
+	jcb_from="", jcb_to="",
+	blocks_from="", blocks_to="",
+	cement_from="", cement_to="",
+	bamboo_from="", bamboo_to="",
+):
 	sales_queryset = _dashboard_base_sales_queryset(date_from, date_to)
 	sales_amount_queryset = _dashboard_sales_amount_queryset(date_from, date_to)
 	transactions_queryset = Transaction.objects.select_related("customer").exclude(
 		category__name=CREDIT_BALANCE_APPLIED_CATEGORY,
 	)
+
+	# "__all__" sentinel means user explicitly chose no date filter for that chart
+	_tipper_from = "" if tipper_from == "__all__" else (tipper_from or date_from or "")
+	_tipper_to = "" if tipper_to == "__all__" else (tipper_to or date_to or "")
+	_jcb_from = "" if jcb_from == "__all__" else (jcb_from or date_from or "")
+	_jcb_to = "" if jcb_to == "__all__" else (jcb_to or date_to or "")
+	_blocks_from = "" if blocks_from == "__all__" else (blocks_from or date_from or "")
+	_blocks_to = "" if blocks_to == "__all__" else (blocks_to or date_to or "")
+	_cement_from = "" if cement_from == "__all__" else (cement_from or date_from or "")
+	_cement_to = "" if cement_to == "__all__" else (cement_to or date_to or "")
+	_bamboo_from = "" if bamboo_from == "__all__" else (bamboo_from or date_from or "")
+	_bamboo_to = "" if bamboo_to == "__all__" else (bamboo_to or date_to or "")
+
 	jcb_queryset = JCBRecord.objects.all()
 	tipper_queryset = TipperRecord.objects.select_related("item")
 	blocks_queryset = BlocksRecord.objects.all()
 	cement_queryset = CementRecord.objects.all()
 	bamboo_queryset = BambooRecord.objects.all()
-	all_time_blocks_queryset = BlocksRecord.objects.all()
-	all_time_cement_queryset = CementRecord.objects.all()
-	all_time_bamboo_queryset = BambooRecord.objects.all()
 	if date_from:
 		transactions_queryset = transactions_queryset.filter(date__gte=date_from)
-		jcb_queryset = jcb_queryset.filter(date__gte=date_from)
-		tipper_queryset = tipper_queryset.filter(date__gte=date_from)
-		blocks_queryset = blocks_queryset.filter(date__gte=date_from)
-		cement_queryset = cement_queryset.filter(date__gte=date_from)
-		bamboo_queryset = bamboo_queryset.filter(date__gte=date_from)
 	if date_to:
 		transactions_queryset = transactions_queryset.filter(date__lte=date_to)
-		jcb_queryset = jcb_queryset.filter(date__lte=date_to)
-		tipper_queryset = tipper_queryset.filter(date__lte=date_to)
-		blocks_queryset = blocks_queryset.filter(date__lte=date_to)
-		cement_queryset = cement_queryset.filter(date__lte=date_to)
-		bamboo_queryset = bamboo_queryset.filter(date__lte=date_to)
+
+	if _jcb_from:
+		jcb_queryset = jcb_queryset.filter(date__gte=_jcb_from)
+	if _jcb_to:
+		jcb_queryset = jcb_queryset.filter(date__lte=_jcb_to)
+	if _tipper_from:
+		tipper_queryset = tipper_queryset.filter(date__gte=_tipper_from)
+	if _tipper_to:
+		tipper_queryset = tipper_queryset.filter(date__lte=_tipper_to)
+	if _blocks_from:
+		blocks_queryset = blocks_queryset.filter(date__gte=_blocks_from)
+	if _blocks_to:
+		blocks_queryset = blocks_queryset.filter(date__lte=_blocks_to)
+	if _cement_from:
+		cement_queryset = cement_queryset.filter(date__gte=_cement_from)
+	if _cement_to:
+		cement_queryset = cement_queryset.filter(date__lte=_cement_to)
+	if _bamboo_from:
+		bamboo_queryset = bamboo_queryset.filter(date__gte=_bamboo_from)
+	if _bamboo_to:
+		bamboo_queryset = bamboo_queryset.filter(date__lte=_bamboo_to)
 
 	kpi_sales = {
 		"total_sales": _dashboard_combined_sales_total(date_from, date_to),
@@ -999,7 +1042,7 @@ def _dashboard_context(request=None, date_from="", date_to=""):
 	net_income = kpi_income_expense["total_income"] - kpi_income_expense["total_expenses"]
 
 	# Blocks Records Summary
-	blocks_summary_raw = all_time_blocks_queryset.aggregate(
+	blocks_summary_raw = blocks_queryset.aggregate(
 		total_investment=Coalesce(Sum("investment"), Value(Decimal("0.00"))),
 		total_sale_income=Coalesce(
 			Sum(
@@ -1016,14 +1059,15 @@ def _dashboard_context(request=None, date_from="", date_to=""):
 		"total_sale_income": blocks_summary_raw["total_sale_income"],
 	}
 	blocks_summary["net_value"] = blocks_summary["total_sale_income"] - blocks_summary["total_investment"]
-	
-	# Stock KPIs are all-time (independent from dashboard date filters).
-	stock_by_unit = BlocksRecord.objects.filter(
+
+	# Stock KPIs are all-time (independent from per-chart date filters).
+	all_time_blocks_queryset = BlocksRecord.objects.all()
+	stock_by_unit = all_time_blocks_queryset.filter(
 		record_type=BlocksRecordType.STOCK
 	).values("unit_type").annotate(
 		total_quantity=Coalesce(Sum("quantity"), Value(0))
 	).order_by("unit_type")
-	
+
 	blocks_summary["four_inch_stock"] = next(
 		(row["total_quantity"] for row in stock_by_unit if row["unit_type"] == BlocksUnitType.FOUR_INCH), 
 		0
@@ -1032,14 +1076,14 @@ def _dashboard_context(request=None, date_from="", date_to=""):
 		(row["total_quantity"] for row in stock_by_unit if row["unit_type"] == BlocksUnitType.SIX_INCH), 
 		0
 	)
-	
-	# Deduct sold quantities
-	sold_by_unit = BlocksRecord.objects.filter(
+
+	# Deduct sold quantities (all-time)
+	sold_by_unit = all_time_blocks_queryset.filter(
 		record_type=BlocksRecordType.SALE
 	).values("unit_type").annotate(
 		total_quantity=Coalesce(Sum("quantity"), Value(0))
 	).order_by("unit_type")
-	
+
 	four_inch_sold = next(
 		(row["total_quantity"] for row in sold_by_unit if row["unit_type"] == BlocksUnitType.FOUR_INCH), 
 		0
@@ -1048,10 +1092,10 @@ def _dashboard_context(request=None, date_from="", date_to=""):
 		(row["total_quantity"] for row in sold_by_unit if row["unit_type"] == BlocksUnitType.SIX_INCH), 
 		0
 	)
-	
+
 	blocks_summary["four_inch_stock"] -= four_inch_sold
 	blocks_summary["six_inch_stock"] -= six_inch_sold
-	
+
 	blocks_summary_labels = ["Investment", "Sale Income"]
 	blocks_summary_values = [
 		float(blocks_summary["total_investment"]),
@@ -1059,7 +1103,7 @@ def _dashboard_context(request=None, date_from="", date_to=""):
 	]
 
 	# Cement Records Summary
-	cement_summary_raw = all_time_cement_queryset.aggregate(
+	cement_summary_raw = cement_queryset.aggregate(
 		total_investment=Coalesce(Sum("investment"), Value(Decimal("0.00"))),
 		total_sale_income=Coalesce(
 			Sum(
@@ -1076,7 +1120,10 @@ def _dashboard_context(request=None, date_from="", date_to=""):
 		"total_sale_income": cement_summary_raw["total_sale_income"],
 	}
 	cement_summary["net_value"] = cement_summary["total_sale_income"] - cement_summary["total_investment"]
-	cement_stock_by_unit = CementRecord.objects.filter(
+
+	# Stock KPIs are all-time
+	all_time_cement_queryset = CementRecord.objects.all()
+	cement_stock_by_unit = all_time_cement_queryset.filter(
 		record_type=CementRecordType.STOCK
 	).values("unit_type").annotate(
 		total_quantity=Coalesce(Sum("quantity"), Value(0))
@@ -1089,7 +1136,7 @@ def _dashboard_context(request=None, date_from="", date_to=""):
 		(row["total_quantity"] for row in cement_stock_by_unit if row["unit_type"] == CementUnitType.OPC),
 		0,
 	)
-	cement_sold_by_unit = CementRecord.objects.filter(
+	cement_sold_by_unit = all_time_cement_queryset.filter(
 		record_type=CementRecordType.SALE
 	).values("unit_type").annotate(
 		total_quantity=Coalesce(Sum("quantity"), Value(0))
@@ -1111,7 +1158,7 @@ def _dashboard_context(request=None, date_from="", date_to=""):
 	]
 
 	# Bamboo Records Summary
-	bamboo_summary_raw = all_time_bamboo_queryset.aggregate(
+	bamboo_summary_raw = bamboo_queryset.aggregate(
 		total_investment=Coalesce(Sum("investment"), Value(Decimal("0.00"))),
 		total_sale_income=Coalesce(
 			Sum(
@@ -1128,10 +1175,13 @@ def _dashboard_context(request=None, date_from="", date_to=""):
 		"total_sale_income": bamboo_summary_raw["total_sale_income"],
 	}
 	bamboo_summary["net_value"] = bamboo_summary["total_sale_income"] - bamboo_summary["total_investment"]
-	bamboo_stock_total = BambooRecord.objects.filter(record_type=BambooRecordType.STOCK).aggregate(
+
+	# Stock KPIs are all-time
+	all_time_bamboo_queryset = BambooRecord.objects.all()
+	bamboo_stock_total = all_time_bamboo_queryset.filter(record_type=BambooRecordType.STOCK).aggregate(
 		total_quantity=Coalesce(Sum("quantity"), Value(0))
 	)["total_quantity"]
-	bamboo_sold_total = BambooRecord.objects.filter(record_type=BambooRecordType.SALE).aggregate(
+	bamboo_sold_total = all_time_bamboo_queryset.filter(record_type=BambooRecordType.SALE).aggregate(
 		total_quantity=Coalesce(Sum("quantity"), Value(0))
 	)["total_quantity"]
 	bamboo_summary["total_sold_units"] = bamboo_sold_total
@@ -1185,6 +1235,16 @@ def _dashboard_context(request=None, date_from="", date_to=""):
 		"filters": {
 			"date_from": date_from,
 			"date_to": date_to,
+			"tipper_from": _tipper_from,
+			"tipper_to": _tipper_to,
+			"jcb_from": _jcb_from,
+			"jcb_to": _jcb_to,
+			"blocks_from": _blocks_from,
+			"blocks_to": _blocks_to,
+			"cement_from": _cement_from,
+			"cement_to": _cement_to,
+			"bamboo_from": _bamboo_from,
+			"bamboo_to": _bamboo_to,
 		},
 	}
 
@@ -2066,12 +2126,45 @@ def dashboard(request):
 	)
 	date_from = date_filters["date_from"]
 	date_to = date_filters["date_to"]
-	context = _dashboard_context(request=request, date_from=date_from, date_to=date_to)
+
+	calendar_mode = get_calendar_mode(request)
+	chart_prefixes = ["tipper", "jcb", "blocks", "cement", "bamboo"]
+	per_chart = {}
+	per_chart_display = {}
+	errs = []
+	for prefix in chart_prefixes:
+		pf, pt = resolve_ad_date_filters(
+			request.GET,
+			default_from=date_from,
+			default_to=date_to,
+			from_key=f"{prefix}_from",
+			to_key=f"{prefix}_to",
+			calendar_mode=calendar_mode,
+			errors=errs,
+		)
+		per_chart[f"{prefix}_from"] = pf
+		per_chart[f"{prefix}_to"] = pt
+		per_chart_display[f"{prefix}_from"] = date_to_calendar_input(
+			ad_string_to_date(pf), calendar_mode
+		) if pf else ""
+		per_chart_display[f"{prefix}_to"] = date_to_calendar_input(
+			ad_string_to_date(pt), calendar_mode
+		) if pt else ""
+	for e in errs:
+		messages.error(request, e)
+
+	context = _dashboard_context(
+		request=request,
+		date_from=date_from,
+		date_to=date_to,
+		**per_chart,
+	)
 	# Pass filters for template default values
 	context["filters"] = {
 		"date_from": date_filters["date_from_display"],
 		"date_to": date_filters["date_to_display"],
 	}
+	context["filters"].update(per_chart_display)
 
 	if request.headers.get("HX-Request"):
 		return render(request, "core/partials/dashboard_content.html", context)

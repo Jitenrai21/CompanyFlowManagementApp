@@ -124,9 +124,16 @@
             <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                     <h2 class="card-title text-xl">JCB Records Summary</h2>
-                    <p class="text-sm text-base-content/70">Income, expense, and total work hours for the selected date range.</p>
+                    <p class="text-sm text-base-content/70">Income, expense, and total work hours.</p>
                 </div>
-                <a href="{% url 'jcb_records' %}" class="btn btn-outline btn-sm">View All JCB Records</a>
+                <div class="flex flex-wrap items-center gap-1">
+                    <div class="join">
+                        <button type="button" class="btn btn-ghost btn-xs join-item js-chart-preset" data-chart="jcb" data-days="30">30 Days</button>
+                        <button type="button" class="btn btn-ghost btn-xs join-item js-chart-preset" data-chart="jcb" data-days="90">90 Days</button>
+                        <button type="button" class="btn btn-ghost btn-xs join-item js-chart-preset" data-chart="jcb" data-days="all">All Time</button>
+                    </div>
+                    <a href="{% url 'jcb_records' %}" class="btn btn-outline btn-sm">View All</a>
+                </div>
             </div>
             <div class="space-y-4">
                 <div class="grid gap-4 lg:grid-cols-3">
@@ -178,9 +185,16 @@
             <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                     <h2 class="card-title text-xl">Tipper Expense vs Value Added</h2>
-                    <p class="text-sm text-base-content/70">Overall total comparison for tipper records in the selected date range.</p>
+                    <p class="text-sm text-base-content/70">Overall total comparison for tipper records.</p>
                 </div>
-                <a href="{% url 'tipper_records' %}" class="btn btn-outline btn-sm">View All Tipper Records</a>
+                <div class="flex flex-wrap items-center gap-1">
+                    <div class="join">
+                        <button type="button" class="btn btn-ghost btn-xs join-item js-chart-preset" data-chart="tipper" data-days="30">30 Days</button>
+                        <button type="button" class="btn btn-ghost btn-xs join-item js-chart-preset" data-chart="tipper" data-days="90">90 Days</button>
+                        <button type="button" class="btn btn-ghost btn-xs join-item js-chart-preset" data-chart="tipper" data-days="all">All Time</button>
+                    </div>
+                    <a href="{% url 'tipper_records' %}" class="btn btn-outline btn-sm">View All</a>
+                </div>
             </div>
             <div class="grid gap-4 lg:grid-cols-3">
                 <div class="cf-section lg:col-span-2 h-full">
@@ -217,9 +231,16 @@
             <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                     <h2 class="card-title text-xl">Blocks Records Summary</h2>
-                    <p class="text-sm text-base-content/70">Investment, income, and inventory stock for blocks production in the selected date range.</p>
+                    <p class="text-sm text-base-content/70">Investment, income, and inventory stock for blocks production.</p>
                 </div>
-                <a href="{% url 'blocks_records' %}" class="btn btn-outline btn-sm">View All Blocks Records</a>
+                <div class="flex flex-wrap items-center gap-1">
+                    <div class="join">
+                        <button type="button" class="btn btn-ghost btn-xs join-item js-chart-preset" data-chart="blocks" data-days="30">30 Days</button>
+                        <button type="button" class="btn btn-ghost btn-xs join-item js-chart-preset" data-chart="blocks" data-days="90">90 Days</button>
+                        <button type="button" class="btn btn-ghost btn-xs join-item js-chart-preset" data-chart="blocks" data-days="all">All Time</button>
+                    </div>
+                    <a href="{% url 'blocks_records' %}" class="btn btn-outline btn-sm">View All</a>
+                </div>
             </div>
             <div class="space-y-4">
                 <div class="grid gap-4 lg:grid-cols-3">
@@ -271,9 +292,16 @@
             <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                     <h2 class="card-title text-xl">Cement Records Summary</h2>
-                    <p class="text-sm text-base-content/70">Investment, income, and inventory stock for cement in the selected date range.</p>
+                    <p class="text-sm text-base-content/70">Investment, income, and inventory stock for cement.</p>
                 </div>
-                <a href="{% url 'cement_records' %}" class="btn btn-outline btn-sm">View All Cement Records</a>
+                <div class="flex flex-wrap items-center gap-1">
+                    <div class="join">
+                        <button type="button" class="btn btn-ghost btn-xs join-item js-chart-preset" data-chart="cement" data-days="30">30 Days</button>
+                        <button type="button" class="btn btn-ghost btn-xs join-item js-chart-preset" data-chart="cement" data-days="90">90 Days</button>
+                        <button type="button" class="btn btn-ghost btn-xs join-item js-chart-preset" data-chart="cement" data-days="all">All Time</button>
+                    </div>
+                    <a href="{% url 'cement_records' %}" class="btn btn-outline btn-sm">View All</a>
+                </div>
             </div>
             <div class="space-y-4">
                 <div class="grid gap-4 lg:grid-cols-3">
@@ -325,9 +353,16 @@
             <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                     <h2 class="card-title text-xl">Bamboo Records Summary</h2>
-                    <p class="text-sm text-base-content/70">Investment, income, and inventory stock for bamboo in the selected date range.</p>
+                    <p class="text-sm text-base-content/70">Investment, income, and inventory stock for bamboo.</p>
                 </div>
-                <a href="{% url 'bamboo_records' %}" class="btn btn-outline btn-sm">View All Bamboo Records</a>
+                <div class="flex flex-wrap items-center gap-1">
+                    <div class="join">
+                        <button type="button" class="btn btn-ghost btn-xs join-item js-chart-preset" data-chart="bamboo" data-days="30">30 Days</button>
+                        <button type="button" class="btn btn-ghost btn-xs join-item js-chart-preset" data-chart="bamboo" data-days="90">90 Days</button>
+                        <button type="button" class="btn btn-ghost btn-xs join-item js-chart-preset" data-chart="bamboo" data-days="all">All Time</button>
+                    </div>
+                    <a href="{% url 'bamboo_records' %}" class="btn btn-outline btn-sm">View All</a>
+                </div>
             </div>
             <div class="space-y-4">
                 <div class="grid gap-4 lg:grid-cols-3">
