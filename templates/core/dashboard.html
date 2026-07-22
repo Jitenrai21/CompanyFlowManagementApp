@@ -5,7 +5,7 @@
 {% block content %}
 <div class="space-y-6">
     <div class="cf-page-header">
-    <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between lg:flex-nowrap">
+        <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between lg:flex-nowrap">
         <div class="shrink-0">
             <h1 class="text-3xl font-extrabold tracking-tight">Dashboard</h1>
             <p class="cf-page-subtitle whitespace-nowrap">KPI overview, trends, and recent activity in one place.</p>
@@ -22,9 +22,9 @@
             hx-push-url="true"
         >
             <!-- Row 1: date range + actions -->
-            <div class="flex flex-wrap items-center gap-3">
+            <div class="flex flex-wrap items-center gap-2 sm:gap-3">
                 <div class="flex items-center gap-1">
-                    <label class="form-control w-36">
+                    <label class="form-control w-28 sm:w-32 md:w-36">
                         <input
                             type="{% if calendar_mode_is_bs %}text{% else %}date{% endif %}"
                             name="date_from"
@@ -36,7 +36,7 @@
                         />
                     </label>
                     <span class="text-[10px] text-base-content/30 mx-0.5">—</span>
-                    <label class="form-control w-36">
+                    <label class="form-control w-28 sm:w-32 md:w-36">
                         <input
                             type="{% if calendar_mode_is_bs %}text{% else %}date{% endif %}"
                             name="date_to"
@@ -49,23 +49,23 @@
                     </label>
                 </div>
 
-                <div class="flex items-center gap-1 ml-auto">
+                <div class="flex items-center gap-1 sm:ml-auto">
                     <button type="submit" class="btn btn-primary btn-sm">Apply</button>
                     <a href="{% url 'dashboard' %}" class="btn btn-outline btn-sm">Reset</a>
                 </div>
             </div>
 
             <!-- Row 2: presets + helper text -->
-            <div class="flex flex-wrap items-center gap-2 mt-2">
+            <div class="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 mt-2">
+                <span class="text-xs font-medium">Preset Range</span>
                 <fieldset class="join">
                     <legend class="sr-only">Preset range</legend>
-                    <button type="button" class="btn btn-ghost btn-xs join-item js-preset-btn" data-days="7">7d</button>
                     <button type="button" class="btn btn-ghost btn-xs join-item js-preset-btn" data-days="30">30d</button>
                     <button type="button" class="btn btn-ghost btn-xs join-item js-preset-btn" data-days="90">90d</button>
-                    <button type="button" class="btn btn-ghost btn-xs join-item js-preset-btn" data-days="365">1y</button>
-                    <button type="button" class="btn btn-ghost btn-xs join-item js-preset-btn" data-days="all">All</button>
+                    <button type="button" class="btn btn-ghost btn-xs join-item js-preset-btn" data-days="180">6mt</button>
+                    <button type="button" class="btn btn-ghost btn-xs join-item js-preset-btn" data-days="365">1yr</button>
                 </fieldset>
-                <span class="text-[10px] italic leading-tight" style="color: var(--cf-ink-soft)">Click a preset to auto-fill the date range above</span>
+                <span class="text-[10px] italic leading-tight hidden sm:inline" style="color: var(--cf-ink-soft)">Click a preset to auto-fill the date range above</span>
             </div>
             
                 <input type="hidden" name="tipper_from" id="hf_tipper_from" value="{{ filters.tipper_from|default:'' }}">
@@ -1204,6 +1204,12 @@
         });
     }
 
+    let _savedScrollY = -1;
+
+    document.getElementById('dashboard-filter-form').addEventListener('submit', function () {
+        _savedScrollY = window.scrollY;
+    });
+
     document.addEventListener('DOMContentLoaded', function () {
         initDashboardCharts();
         initChartFilterControls();
@@ -1222,6 +1228,10 @@
     });
     document.body.addEventListener('htmx:afterSwap', (event) => {
         if (event.target && event.target.id === 'dashboard-content') {
+            if (_savedScrollY >= 0) {
+                window.scrollTo(0, _savedScrollY);
+                _savedScrollY = -1;
+            }
             initDashboardCharts();
             initChartFilterControls();
         }
