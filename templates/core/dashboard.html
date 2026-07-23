@@ -62,7 +62,7 @@
                     <legend class="sr-only">Preset range</legend>
                     <button type="button" class="btn btn-ghost btn-xs join-item js-preset-btn" data-days="30">30d</button>
                     <button type="button" class="btn btn-ghost btn-xs join-item js-preset-btn" data-days="90">90d</button>
-                    <button type="button" class="btn btn-ghost btn-xs join-item js-preset-btn" data-days="180">6mt</button>
+                    <button type="button" class="btn btn-ghost btn-xs join-item js-preset-btn" data-days="180">6mo</button>
                     <button type="button" class="btn btn-ghost btn-xs join-item js-preset-btn" data-days="365">1yr</button>
                 </fieldset>
                 <span class="text-[10px] italic leading-tight hidden sm:inline" style="color: var(--cf-ink-soft)">Click a preset to auto-fill the date range above</span>
@@ -1155,26 +1155,46 @@
         applyKpiLabelAccessibility(dashboardRoot);
     }
 
+    function syncActivePresets() {
+        var headerActive = sessionStorage.getItem('dp_preset') || '';
+        document.querySelectorAll('.js-preset-btn').forEach(function (btn) {
+            btn.classList.toggle('btn-active', btn.dataset.days === headerActive);
+        });
+        document.querySelectorAll('.js-chart-preset').forEach(function (btn) {
+            var chart = btn.dataset.chart;
+            var val = sessionStorage.getItem('dp_' + chart + '_preset') || '';
+            btn.classList.toggle('btn-active', btn.dataset.days === val);
+        });
+    }
+
     function initChartFilterControls() {
         document.querySelectorAll('.js-preset-btn').forEach((btn) => {
             btn.removeEventListener('click', btn._handler);
             btn._handler = function (e) {
                 e.preventDefault();
-                const days = this.dataset.days;
-                const fromInput = document.querySelector('.js-date-from');
-                const toInput = document.querySelector('.js-date-to');
+                var form = document.getElementById('dashboard-filter-form');
+                var days = this.dataset.days;
+
+                document.querySelectorAll('.js-preset-btn').forEach(function (b) {
+                    b.classList.remove('btn-active');
+                });
+                this.classList.add('btn-active');
+                sessionStorage.setItem('dp_preset', days !== 'all' ? days : '');
+
+                var fromInput = form.querySelector('.js-date-from');
+                var toInput = form.querySelector('.js-date-to');
                 if (days === 'all') {
                     fromInput.value = '';
                     toInput.value = '';
                 } else {
-                    const today = new Date();
-                    const fromDate = new Date(today);
+                    var today = new Date();
+                    var fromDate = new Date(today);
                     fromDate.setDate(today.getDate() - parseInt(days, 10));
-                    const fmt = (d) => d.toISOString().split('T')[0];
+                    var fmt = function (d) { return d.toISOString().split('T')[0]; };
                     fromInput.value = fmt(fromDate);
                     toInput.value = fmt(today);
                 }
-                document.getElementById('dashboard-filter-form').requestSubmit();
+                form.requestSubmit();
             };
             btn.addEventListener('click', btn._handler);
         });
@@ -1183,22 +1203,30 @@
             btn.removeEventListener('click', btn._presetHandler);
             btn._presetHandler = function (e) {
                 e.preventDefault();
-                const chart = this.dataset.chart;
-                const days = this.dataset.days;
-                const fromHidden = document.getElementById('hf_' + chart + '_from');
-                const toHidden = document.getElementById('hf_' + chart + '_to');
+                var form = document.getElementById('dashboard-filter-form');
+                var chart = this.dataset.chart;
+                var days = this.dataset.days;
+
+                document.querySelectorAll('.js-chart-preset[data-chart="' + chart + '"]').forEach(function (b) {
+                    b.classList.remove('btn-active');
+                });
+                this.classList.add('btn-active');
+                sessionStorage.setItem('dp_' + chart + '_preset', days !== 'all' ? days : '');
+
+                var fromHidden = form.querySelector('[name=' + chart + '_from]');
+                var toHidden = form.querySelector('[name=' + chart + '_to]');
                 if (days === 'all') {
                     fromHidden.value = '__all__';
                     toHidden.value = '__all__';
                 } else {
-                    const today = new Date();
-                    const fromDate = new Date(today);
+                    var today = new Date();
+                    var fromDate = new Date(today);
                     fromDate.setDate(today.getDate() - parseInt(days, 10));
-                    const fmt = (d) => d.toISOString().split('T')[0];
+                    var fmt = function (d) { return d.toISOString().split('T')[0]; };
                     fromHidden.value = fmt(fromDate);
                     toHidden.value = fmt(today);
                 }
-                document.getElementById('dashboard-filter-form').requestSubmit();
+                form.requestSubmit();
             };
             btn.addEventListener('click', btn._presetHandler);
         });
@@ -1213,6 +1241,7 @@
     document.addEventListener('DOMContentLoaded', function () {
         initDashboardCharts();
         initChartFilterControls();
+        syncActivePresets();
     });
     window.addEventListener('resize', () => {
         const nextViewportMode = getDashboardViewportMode();
@@ -1234,8 +1263,10 @@
             }
             initDashboardCharts();
             initChartFilterControls();
+            syncActivePresets();
         }
     });
     initChartFilterControls();
+    syncActivePresets();
 </script>
 {% endblock %}
