@@ -1167,6 +1167,40 @@
         });
     }
 
+    function saveDatesToSession() {
+        var form = document.getElementById('dashboard-filter-form');
+        if (!form) return;
+        var fd = form.querySelector('.js-date-from'), td = form.querySelector('.js-date-to');
+        if (fd) { sessionStorage.setItem('dp_date_from', fd.value); sessionStorage.setItem('dp_date_to', td.value); }
+        ['tipper','jcb','blocks','cement','bamboo'].forEach(function(chart) {
+            var fh = form.querySelector('[name=' + chart + '_from]');
+            var th = form.querySelector('[name=' + chart + '_to]');
+            if (fh) { sessionStorage.setItem('dp_' + chart + '_from', fh.value); sessionStorage.setItem('dp_' + chart + '_to', th.value); }
+        });
+    }
+
+    function restoreFilterState() {
+        var form = document.getElementById('dashboard-filter-form');
+        if (!form) return;
+        var headerPreset = sessionStorage.getItem('dp_preset');
+        var storedFrom = sessionStorage.getItem('dp_date_from');
+        var fromInput = form.querySelector('.js-date-from');
+        if (headerPreset && storedFrom && fromInput && !fromInput.value) {
+            fromInput.value = storedFrom;
+            form.querySelector('.js-date-to').value = sessionStorage.getItem('dp_date_to') || '';
+            ['tipper','jcb','blocks','cement','bamboo'].forEach(function(chart) {
+                var cf = sessionStorage.getItem('dp_' + chart + '_from');
+                if (cf) {
+                    var fh = form.querySelector('[name=' + chart + '_from]');
+                    var th = form.querySelector('[name=' + chart + '_to]');
+                    if (fh) fh.value = cf;
+                    if (th) th.value = sessionStorage.getItem('dp_' + chart + '_to') || '';
+                }
+            });
+            form.requestSubmit();
+        }
+    }
+
     function initChartFilterControls() {
         document.querySelectorAll('.js-preset-btn').forEach((btn) => {
             btn.removeEventListener('click', btn._handler);
@@ -1194,6 +1228,7 @@
                     fromInput.value = fmt(fromDate);
                     toInput.value = fmt(today);
                 }
+                saveDatesToSession();
                 form.requestSubmit();
             };
             btn.addEventListener('click', btn._handler);
@@ -1226,6 +1261,7 @@
                     fromHidden.value = fmt(fromDate);
                     toHidden.value = fmt(today);
                 }
+                saveDatesToSession();
                 form.requestSubmit();
             };
             btn.addEventListener('click', btn._presetHandler);
@@ -1242,6 +1278,7 @@
         initDashboardCharts();
         initChartFilterControls();
         syncActivePresets();
+        restoreFilterState();
     });
     window.addEventListener('resize', () => {
         const nextViewportMode = getDashboardViewportMode();
