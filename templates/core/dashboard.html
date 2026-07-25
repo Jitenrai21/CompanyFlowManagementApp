@@ -19,7 +19,6 @@
             hx-swap="innerHTML scroll:false"
             hx-trigger="change delay:300ms, submit"
             hx-indicator="#dashboard-loading"
-            hx-push-url="true"
         >
             <!-- Row 1: date range + actions -->
             <div class="flex flex-wrap items-center gap-2 sm:gap-3">
@@ -68,16 +67,16 @@
                 <span class="text-[10px] italic leading-tight hidden sm:inline" style="color: var(--cf-ink-soft)">Click a preset to auto-fill the date range above</span>
             </div>
             
-                <input type="hidden" name="tipper_from" id="hf_tipper_from" value="{{ filters.tipper_from|default:'' }}">
-                <input type="hidden" name="tipper_to" id="hf_tipper_to" value="{{ filters.tipper_to|default:'' }}">
-                <input type="hidden" name="jcb_from" id="hf_jcb_from" value="{{ filters.jcb_from|default:'' }}">
-                <input type="hidden" name="jcb_to" id="hf_jcb_to" value="{{ filters.jcb_to|default:'' }}">
-                <input type="hidden" name="blocks_from" id="hf_blocks_from" value="{{ filters.blocks_from|default:'' }}">
-                <input type="hidden" name="blocks_to" id="hf_blocks_to" value="{{ filters.blocks_to|default:'' }}">
-                <input type="hidden" name="cement_from" id="hf_cement_from" value="{{ filters.cement_from|default:'' }}">
-                <input type="hidden" name="cement_to" id="hf_cement_to" value="{{ filters.cement_to|default:'' }}">
-                <input type="hidden" name="bamboo_from" id="hf_bamboo_from" value="{{ filters.bamboo_from|default:'' }}">
-                <input type="hidden" name="bamboo_to" id="hf_bamboo_to" value="{{ filters.bamboo_to|default:'' }}">
+                <input type="hidden" name="tipper_from" id="hf_tipper_from" value="{{ filters.tipper_from_raw|default:'' }}">
+                <input type="hidden" name="tipper_to" id="hf_tipper_to" value="{{ filters.tipper_to_raw|default:'' }}">
+                <input type="hidden" name="jcb_from" id="hf_jcb_from" value="{{ filters.jcb_from_raw|default:'' }}">
+                <input type="hidden" name="jcb_to" id="hf_jcb_to" value="{{ filters.jcb_to_raw|default:'' }}">
+                <input type="hidden" name="blocks_from" id="hf_blocks_from" value="{{ filters.blocks_from_raw|default:'' }}">
+                <input type="hidden" name="blocks_to" id="hf_blocks_to" value="{{ filters.blocks_to_raw|default:'' }}">
+                <input type="hidden" name="cement_from" id="hf_cement_from" value="{{ filters.cement_from_raw|default:'' }}">
+                <input type="hidden" name="cement_to" id="hf_cement_to" value="{{ filters.cement_to_raw|default:'' }}">
+                <input type="hidden" name="bamboo_from" id="hf_bamboo_from" value="{{ filters.bamboo_from_raw|default:'' }}">
+                <input type="hidden" name="bamboo_to" id="hf_bamboo_to" value="{{ filters.bamboo_to_raw|default:'' }}">
             </form>
         </div>
     </div>
@@ -1167,38 +1166,13 @@
         });
     }
 
-    function saveDatesToSession() {
+    function pushUrlFromForm() {
         var form = document.getElementById('dashboard-filter-form');
         if (!form) return;
-        var fd = form.querySelector('.js-date-from'), td = form.querySelector('.js-date-to');
-        if (fd) { sessionStorage.setItem('dp_date_from', fd.value); sessionStorage.setItem('dp_date_to', td.value); }
-        ['tipper','jcb','blocks','cement','bamboo'].forEach(function(chart) {
-            var fh = form.querySelector('[name=' + chart + '_from]');
-            var th = form.querySelector('[name=' + chart + '_to]');
-            if (fh) { sessionStorage.setItem('dp_' + chart + '_from', fh.value); sessionStorage.setItem('dp_' + chart + '_to', th.value); }
-        });
-    }
-
-    function restoreFilterState() {
-        var form = document.getElementById('dashboard-filter-form');
-        if (!form) return;
-        var headerPreset = sessionStorage.getItem('dp_preset');
-        var storedFrom = sessionStorage.getItem('dp_date_from');
-        var fromInput = form.querySelector('.js-date-from');
-        if (headerPreset && storedFrom && fromInput && !fromInput.value) {
-            fromInput.value = storedFrom;
-            form.querySelector('.js-date-to').value = sessionStorage.getItem('dp_date_to') || '';
-            ['tipper','jcb','blocks','cement','bamboo'].forEach(function(chart) {
-                var cf = sessionStorage.getItem('dp_' + chart + '_from');
-                if (cf) {
-                    var fh = form.querySelector('[name=' + chart + '_from]');
-                    var th = form.querySelector('[name=' + chart + '_to]');
-                    if (fh) fh.value = cf;
-                    if (th) th.value = sessionStorage.getItem('dp_' + chart + '_to') || '';
-                }
-            });
-            form.requestSubmit();
-        }
+        var fd = new FormData(form);
+        var params = new URLSearchParams(fd).toString();
+        var base = form.getAttribute('hx-get') || window.location.pathname;
+        history.replaceState({}, '', base + (params ? '?' + params : ''));
     }
 
     function initChartFilterControls() {
@@ -1228,7 +1202,7 @@
                     fromInput.value = fmt(fromDate);
                     toInput.value = fmt(today);
                 }
-                saveDatesToSession();
+                pushUrlFromForm();
                 form.requestSubmit();
             };
             btn.addEventListener('click', btn._handler);
@@ -1261,7 +1235,7 @@
                     fromHidden.value = fmt(fromDate);
                     toHidden.value = fmt(today);
                 }
-                saveDatesToSession();
+                pushUrlFromForm();
                 form.requestSubmit();
             };
             btn.addEventListener('click', btn._presetHandler);
@@ -1278,7 +1252,6 @@
         initDashboardCharts();
         initChartFilterControls();
         syncActivePresets();
-        restoreFilterState();
     });
     window.addEventListener('resize', () => {
         const nextViewportMode = getDashboardViewportMode();

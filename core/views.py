@@ -2139,7 +2139,7 @@ def dashboard(request):
 			default_to=date_to,
 			from_key=f"{prefix}_from",
 			to_key=f"{prefix}_to",
-			calendar_mode=calendar_mode,
+			calendar_mode="ad",
 			errors=errs,
 		)
 		per_chart[f"{prefix}_from"] = pf
@@ -2165,6 +2165,9 @@ def dashboard(request):
 		"date_to": date_filters["date_to_display"],
 	}
 	context["filters"].update(per_chart_display)
+	for prefix in chart_prefixes:
+		context["filters"][f"{prefix}_from_raw"] = per_chart.get(f"{prefix}_from", "")
+		context["filters"][f"{prefix}_to_raw"] = per_chart.get(f"{prefix}_to", "")
 
 	if request.headers.get("HX-Request"):
 		return render(request, "core/partials/dashboard_content.html", context)
